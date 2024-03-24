@@ -25,6 +25,8 @@ export default class Findex extends Plugin {
 //			const theNotice = this.app.vault.adapter.basePath;
 //			const theNotice = this.app.workspace.getActiveFile().path;
 			const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
+			const findexFile = path.join(this.app.vault.adapter.basePath, 'folder-index.md')
+			fs.writeFileSync(findexFile, 'here are the files ...' + '\n')
 			fs.readdir(dirPath, (err, files) => {
 			    if (err) {
 			        return console.error('Unable to scan directory: ' + err);
