@@ -1,4 +1,5 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
+import * as fs from 'fs';
 import * as path from 'path';
 
 // Remember to rename these classes and interfaces!
@@ -22,7 +23,8 @@ export default class Findex extends Plugin {
 			// Called when the user clicks the icon.
 //			let theNotice: string = 'Index these here files!';
 //			const theNotice = this.app.vault.adapter.basePath;
-			const theNotice = this.app.workspace.getActiveFile().path;
+//			const theNotice = this.app.workspace.getActiveFile().path;
+			const theNotice = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
 			new Notice(theNotice);
 		});
 		// Perform additional things with the ribbon
