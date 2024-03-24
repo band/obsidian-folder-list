@@ -30,7 +30,9 @@ export default class Findex extends Plugin {
 				    if (err) {
 				        reject('Unable to scan directory: ' + err);
 				    } else {
-					resolve(files);
+				      	// filter out dofiles and files that start with "idx-"
+					let filteredFiles = files.filter(file => !file.startsWith('.') && !file.startsWith('idx-'));
+					resolve(filteredFiles);
 				    }
 				});
 			    });
