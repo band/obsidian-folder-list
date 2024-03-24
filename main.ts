@@ -24,8 +24,17 @@ export default class Findex extends Plugin {
 //			let theNotice: string = 'Index these here files!';
 //			const theNotice = this.app.vault.adapter.basePath;
 //			const theNotice = this.app.workspace.getActiveFile().path;
-			const theNotice = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
-			new Notice(theNotice);
+			const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
+			fs.readdir(dirPath, (err, files) => {
+			    if (err) {
+			        return console.error('Unable to scan directory: ' + err);
+			    }
+			    files.forEach((file) => {
+			        console.log(file);
+			    });
+			});
+				
+			new Notice(dirPath);
 		});
 		// Perform additional things with the ribbon
 		ribbonIconEl.addClass('findex-ribbon-class');
