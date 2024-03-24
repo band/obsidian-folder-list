@@ -39,6 +39,10 @@ export default class Findex extends Plugin {
 			}
 			const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
 			const findexFile = path.join(this.app.vault.adapter.basePath, 'folder-index.md')
+			let indexHeader = path.join(dirPath, '.indexHeading.md');
+			fs.copyFile(indexHeader, findexFile, () => {
+			    console.log('Header file copy successful');
+			});
 			let fileList: string[];
 			listFiles(dirPath)
 			    .then(files => {
