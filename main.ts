@@ -71,7 +71,7 @@ export default class Findex extends Plugin {
 				console.log('the index file: ', findexFile);
 				fileList.forEach((file) => {
 				    console.log('the file: ', file);
-				    fs.appendFile(findexFile, `[[${file}]]  ` + '\n', (err) => {
+				    fs.appendFile(findexFile, ` - [[${file}]]  ` + '\n', (err) => {
 				        if (err) {
 					    console.error('Error writing file:', err);
 					} else {
