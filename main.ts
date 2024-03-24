@@ -24,18 +24,38 @@ export default class Findex extends Plugin {
 //			let theNotice: string = 'Index these here files!';
 //			const theNotice = this.app.vault.adapter.basePath;
 //			const theNotice = this.app.workspace.getActiveFile().path;
+			function listFiles(directoryPath: string): Promise<string[]> {
+			    return new Promise((resolve, reject) => {
+			        fs.readdir(directoryPath, (err, files) => {
+				    if (err) {
+				        reject('Unable to scan directory: ' + err);
+				    } else {
+					resolve(files);
+				    }
+				});
+			    });
+			}
 			const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
 			const findexFile = path.join(this.app.vault.adapter.basePath, 'folder-index.md')
-			fs.writeFileSync(findexFile, 'here are the files ...' + '\n')
-			fs.readdir(dirPath, (err, files) => {
-			    if (err) {
-			        return console.error('Unable to scan directory: ' + err);
-			    }
-			    files.forEach((file) => {
-			        console.log(file);
-			    });
-			});
-				
+			let fileList: string[];
+			listFiles(dirPath)
+			    .then(files => {
+			        fileList = files;
+				console.log(fileList);
+				console.log('the index file: ', findexFile);
+				fileList.forEach((file) => {
+				    console.log('the file: ', file);
+				    fs.appendFile(findexFile, file + '\n', (err) => {
+				        if (err) {
+					    console.error('Error writing file:', err);
+					} else {
+					    console.log('File name write successful');
+					}
+				    });
+				});
+			    })
+			    .catch(error => console.error(error));
+
 			new Notice(dirPath);
 		});
 		// Perform additional things with the ribbon
