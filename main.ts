@@ -1,6 +1,7 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as util from 'util';
 
 // Remember to rename these classes and interfaces!
 
@@ -37,6 +38,25 @@ export default class Findex extends Plugin {
 				});
 			    });
 			}
+
+			const readdir = util.promisify(fs.readdir);
+			const stat = util.promisify(fs.stat);
+
+			async function getFiles(directoryPath: string): Promise<string[]> {
+			    // Get the files in the directory
+			    let files = await readdir(directoryPath);
+			    // Filter out dotfiles and files that start with "idx-"
+			    let filteredFiles = files.filter(file => !file.startsWith('.') && !file.startsWith('idx-'));
+			    // Get the stats for each file
+			    let stats = await Promise.all(filteredFiles.map(file => stat(path.join(directoryPath, file))));
+			    // Pair each file with its stats
+			    let fileStats = filteredFiles.map((file, index) => ({file, stats: stats[index]}));
+			    // Sort the files by modification date, most recent first
+			    fileStats.sort((a, b) => b.stats.mtime.getTime() - a.stats.mtime.getTime());
+			    // Return the sorted list of file names
+			    return fileStats.map(fileStat => fileStat.file);
+			}
+
 			const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
 			const findexFile = path.join(this.app.vault.adapter.basePath, 'folder-index.md')
 			let indexHeader = path.join(dirPath, '.indexHeading.md');
@@ -44,7 +64,7 @@ export default class Findex extends Plugin {
 			    console.log('Header file copy successful');
 			});
 			let fileList: string[];
-			listFiles(dirPath)
+			getFiles(dirPath)
 			    .then(files => {
 			        fileList = files;
 				console.log(fileList);
