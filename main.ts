@@ -13,18 +13,26 @@ const DEFAULT_SETTINGS: FindexSettings = {
 	mySetting: 'default'
 }
 
+interface FindexData {
+	  omittedPaths: string[];
+}
+
+const DEFAULT_DATA: FindexData = {
+      omittedPaths: [],
+};
+
 export default class Findex extends Plugin {
 	settings: FindexSettings;
 
 	async onload() {
-		await this.loadSettings();
+	      console.log('Findex: loading plugin v' + this.manifest.version);
+	      
+	      await this.loadData();
+//	      await this.loadSettings();
 
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
-//			let theNotice: string = 'Index these here files!';
-//			const theNotice = this.app.vault.adapter.basePath;
-//			const theNotice = this.app.workspace.getActiveFile().path;
 			function listFiles(directoryPath: string): Promise<string[]> {
 			    return new Promise((resolve, reject) => {
 			        fs.readdir(directoryPath, (err, files) => {
@@ -58,7 +66,8 @@ export default class Findex extends Plugin {
 			}
 
 			const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
-			const findexFile = path.join(this.app.vault.adapter.basePath, 'folder-index.md')
+//			const findexFile = path.join(this.app.vault.adapter.basePath, 'folder-index.md')
+			const findexFile = path.join(this.app.vault.adapter.basePath, 'idx-' + path.basename(dirPath))			
 			let indexHeader = path.join(dirPath, '.indexHeading.md');
 			fs.copyFile(indexHeader, findexFile, () => {
 			    console.log('Header file copy successful');
@@ -170,16 +179,31 @@ class SampleSettingTab extends PluginSettingTab {
 		const {containerEl} = this;
 
 		containerEl.empty();
+		containerEl.createEl('h2', { text: 'Folder indexing' });
 
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
+		const fragment = document.createDocumentFragment();
+		const link = document.createElement('a');
+		link.href =
+		  'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions#writing_a_regular_expression_pattern';
+		link.text = 'MDN - Regular expressions';
+		fragment.append('RegExp patterns to ignore. One pattern per line. See ');
+		fragment.append(link);
+		fragment.append(' for help.');
+
+            new Setting(containerEl)
+	      .setName('Omitted folder pathname patterns')
+	      .setDesc(fragment)
+	      .addTextArea((textArea) => {
+	          textArea.inputEl.setAttr('rows', 6);
+		  textArea
+	              .setPlaceholder('^daily/\n\\.png$\nfoobar.*baz')
+		      .setValue(this.plugin.data.omittedPaths.join('\n'));
+		  textArea.inputEl.onblur = (e: FocusEvent) => {
+		        const patterns = (e.target as HTMLInputElement).value;
+			this.plugin.data.omittedPaths = patterns.split('\n');
+			this.plugin.pruneOmittedFiles();
+			this.plugin.view.redraw();
+		  };
+	        });
 	}
 }
