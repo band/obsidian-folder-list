@@ -33,47 +33,19 @@ export default class Findex extends Plugin {
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
-			function listFiles(directoryPath: string): Promise<string[]> {
-			    return new Promise((resolve, reject) => {
-			        fs.readdir(directoryPath, (err, files) => {
-				    if (err) {
-				        reject('Unable to scan directory: ' + err);
-				    } else {
-				      	// filter out dofiles and files that start with "idx-"
-					let filteredFiles = files.filter(file => !file.startsWith('.') && !file.startsWith('idx-'));
-					resolve(filteredFiles);
-				    }
-				});
-			    });
-			}
-
-			const readdir = util.promisify(fs.readdir);
-			const stat = util.promisify(fs.stat);
-
-			async function getFiles(directoryPath: string): Promise<string[]> {
-			    // Get the files in the directory
-			    let files = await readdir(directoryPath);
-			    // Filter out dotfiles and files that start with "idx-"
-			    let filteredFiles = files.filter(file => !file.startsWith('.') && !file.startsWith('idx-'));
-			    // Get the stats for each file
-			    let stats = await Promise.all(filteredFiles.map(file => stat(path.join(directoryPath, file))));
-			    // Pair each file with its stats
-			    let fileStats = filteredFiles.map((file, index) => ({file, stats: stats[index]}));
-			    // Sort the files by modification date, most recent first
-			    fileStats.sort((a, b) => b.stats.mtime.getTime() - a.stats.mtime.getTime());
-			    // Return the sorted list of file names
-			    return fileStats.map(fileStat => fileStat.file);
-			}
+			const getSortedFiles = async (dir) => {
+			    return fs.readdirSync(dir).filter(item => !fs.statSync(path.join(dir,item)).isDirectory() && !item.startsWith('.') && !item.startsWith('idx-')).sort((a,b) => fs.statSync(path.join(dir,b)).mtimeMs - fs.statSync(path.join(dir,a)).mtimeMs);
+			};
 
 			const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
-//			const findexFile = path.join(this.app.vault.adapter.basePath, 'folder-index.md')
 			const findexFile = path.join(dirPath, ('idx-' + path.basename(dirPath) + '.md').toLowerCase());
 			let indexHeader = path.join(dirPath, '.indexHeading.md');
+			// TODO: handle missing indexHeader file
 			fs.copyFile(indexHeader, findexFile, () => {
 			    console.log('Header file copy successful');
 			});
 			let fileList: string[];
-			getFiles(dirPath)
+			getSortedFiles(dirPath)
 			    .then(files => {
 			        fileList = files;
 				console.log(fileList);
