@@ -37,7 +37,7 @@ export default class Findex extends Plugin {
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
 			const getSortedFiles = async (dir) => {
-			    return fs.readdirSync(dir).filter(item => !fs.statSync(path.join(dir,item)).isDirectory() && !item.startsWith('.') && !item.startsWith('idx-')).sort((a,b) => fs.statSync(path.join(dir,b)).mtimeMs - fs.statSync(path.join(dir,a)).mtimeMs);
+			    return fs.readdirSync(dir).filter(item => !fs.statSync(path.join(dir,item)).isDirectory() && !item.startsWith('.') && !item.startsWith('idx-')).sort((a,b) => fs.statSync(path.join(dir,b)).mtime.getTime() - fs.statSync(path.join(dir,a)).mtime.getTime());
 			};
 
 			const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
@@ -68,6 +68,7 @@ export default class Findex extends Plugin {
 
 			new Notice(dirPath);
 		});
+
 		// Perform additional things with the ribbon
 		ribbonIconEl.addClass('findex-ribbon-class');
 
@@ -79,6 +80,7 @@ export default class Findex extends Plugin {
 				new SampleModal(this.app).open();
 			}
 		});
+/*
 
 		// This adds a complex command that can check whether the current state of the app allows execution of the command
 		this.addCommand({
@@ -99,6 +101,7 @@ export default class Findex extends Plugin {
 				}
 			}
 		});
+*/
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new FindexSettingTab(this.app, this));
@@ -139,6 +142,7 @@ class FindexSettingTab extends PluginSettingTab {
 
 		console.log('this.plugin ', this.plugin);
 		console.log('- plugin settings: ', this.plugin.settings);
+		console.log('- mySetting: ', this.plugin.settings.mySetting);
 		containerEl.empty();
 		containerEl.createEl('h2', { text: 'Folder indexing' });
 
@@ -158,11 +162,12 @@ class FindexSettingTab extends PluginSettingTab {
 	          textArea.inputEl.setAttr('rows', 6);
 		  textArea
 	              .setPlaceholder('^daily/\n\\.png$\nfoobar.*baz')
-		      .setValue(this.plugin.omittedPaths.join('\n'));
+//		      .setValue(this.plugin.omittedPaths.join('\n'));
+      		      .setValue(this.plugin.omittedPaths);
 		  textArea.inputEl.onblur = (e: FocusEvent) => {
 		        const patterns = (e.target as HTMLInputElement).value;
 			this.plugin.omittedPaths = patterns.split('\n');
-			this.plugin.pruneOmittedFiles();
+//			this.plugin.pruneOmittedFiles();
 			this.plugin.view.redraw();
 		  };
 	        });
