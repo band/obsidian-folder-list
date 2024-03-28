@@ -47,31 +47,30 @@ export default class Findex extends Plugin {
 			fs.copyFile(indexHeader, findexFile, () => {
 			    console.log('Header file copy successful');
 			});
-			let fileList: string[];
 			getSortedFiles(dirPath)
 			    .then(files => {
-			        fileList = files;
-				console.log(fileList);
+				console.log('the list of files: ',files)
 				console.log('the index file: ', findexFile);
-				fileList.forEach((file) => {
-				    console.log('the file: ', file);
-				    fs.appendFile(findexFile, ` - [[${file}]]  ` + '\n', (err) => {
+				
+				for(const i of Object.keys(files)) {
+				    console.log('the file: ', files[i])
+				    fs.appendFileSync(findexFile, ` - [[${files[i]}]]  ` + '\n', (err) => {
 				        if (err) {
 					    console.error('Error writing file:', err);
 					} else {
 					    console.log('File name write successful');
 					}
 				    });
-				});
+				}
 			    })
 			    .catch(error => console.error(error));
 
 			new Notice(dirPath);
 		});
-
+/*
 		// Perform additional things with the ribbon
 		ribbonIconEl.addClass('findex-ribbon-class');
-
+*/
 		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
 			id: 'open-sample-modal-simple',
