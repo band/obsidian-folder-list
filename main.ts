@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
+import { App, FileStat, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as util from 'util';
@@ -7,10 +7,12 @@ import * as util from 'util';
 
 interface FindexSettings {
 	mySetting: string;
+	omittedPaths: string[];
 }
 
 const DEFAULT_SETTINGS: FindexSettings = {
-	mySetting: 'default'
+	mySetting: 'default',
+	omittedPaths: [],
 }
 
 interface FindexData {
@@ -23,13 +25,14 @@ const DEFAULT_DATA: FindexData = {
 
 export default class Findex extends Plugin {
 	settings: FindexSettings;
+	data: FindexData;
 
 	async onload() {
 	      console.log('Findex: loading plugin v' + this.manifest.version);
-	      
-	      await this.loadData();
-//	      await this.loadSettings();
 
+	      await this.loadData();
+	      await this.loadSettings();
+	      
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
@@ -98,7 +101,7 @@ export default class Findex extends Plugin {
 		});
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.addSettingTab(new FindexSettingTab(this.app, this));
 
 		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
 		// Using this function will automatically remove the event listener when this plugin is disabled.
@@ -123,23 +126,7 @@ export default class Findex extends Plugin {
 	}
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
-}
-
-class SampleSettingTab extends PluginSettingTab {
+class FindexSettingTab extends PluginSettingTab {
 	plugin: Findex;
 
 	constructor(app: App, plugin: Findex) {
@@ -150,6 +137,8 @@ class SampleSettingTab extends PluginSettingTab {
 	display(): void {
 		const {containerEl} = this;
 
+		console.log('this.plugin ', this.plugin);
+		console.log('- plugin settings: ', this.plugin.settings);
 		containerEl.empty();
 		containerEl.createEl('h2', { text: 'Folder indexing' });
 
@@ -169,10 +158,10 @@ class SampleSettingTab extends PluginSettingTab {
 	          textArea.inputEl.setAttr('rows', 6);
 		  textArea
 	              .setPlaceholder('^daily/\n\\.png$\nfoobar.*baz')
-		      .setValue(this.plugin.data.omittedPaths.join('\n'));
+		      .setValue(this.plugin.omittedPaths.join('\n'));
 		  textArea.inputEl.onblur = (e: FocusEvent) => {
 		        const patterns = (e.target as HTMLInputElement).value;
-			this.plugin.data.omittedPaths = patterns.split('\n');
+			this.plugin.omittedPaths = patterns.split('\n');
 			this.plugin.pruneOmittedFiles();
 			this.plugin.view.redraw();
 		  };
