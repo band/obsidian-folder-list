@@ -43,7 +43,7 @@ export default class Findex extends Plugin {
 			const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
 			const findexFile = path.join(dirPath, ('idx-' + path.basename(dirPath) + '.md').toLowerCase());
 			let indexHeader = path.join(dirPath, '.indexHeading.md');
-		    // TODO: handle missing indexHeader file
+		    // create index header if needed
 		    if (fs.existsSync(indexHeader)) {
 			fs.copyFileSync(indexHeader, findexFile);
 		    } else {
@@ -56,7 +56,7 @@ export default class Findex extends Plugin {
 				console.log('the index file: ', findexFile);
 				
 				for(const i of Object.keys(files)) {
-				    console.log('the file: ', files[i])
+//				    console.log('the file: ', files[i])
 				    fs.appendFileSync(findexFile, ` - [[${files[i]}]]  ` + '\n', (err) => {
 				        if (err) {
 					    console.error('Error writing file:', err);
@@ -82,28 +82,6 @@ export default class Findex extends Plugin {
 				new SampleModal(this.app).open();
 			}
 		});
-/*
-
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-			}
-		});
-*/
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 	        this.addSettingTab(new FindexSettingTab(this.app, this));
@@ -114,8 +92,8 @@ export default class Findex extends Plugin {
 //		    const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
 		    const pPath = this.app.workspace.getActiveFile().parent.path;
 		    console.log('regEvent pPath: ',pPath);
-		    if (file.path.startsWith(pPath)) {
-			console.log(`File modified in target directory: ${file.path}`);
+		    if (file.path.startsWith(pPath) || pPath === "/") {
+			console.log(`File modified in ActiveFile directory: ${file.name}`);
 		    }
 		})
 	    );
