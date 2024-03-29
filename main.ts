@@ -103,9 +103,21 @@ export default class Findex extends Plugin {
 */
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new FindexSettingTab(this.app, this));
+	        this.addSettingTab(new FindexSettingTab(this.app, this));
 
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
+	    this.registerEvent(
+		this.app.vault.on('modify', (file) => {
+		    console.log('regEvent file: ', file);
+		    const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
+		    const pPath = this.app.workspace.getActiveFile().parent.path;
+		    console.log('regEvent pPath: ',pPath);
+		    if (file.path.startsWith(pPath)) {
+			console.log(`File modified in target directory: ${file.path}`);
+		    }
+		})
+	    );
+
+	    // If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
 		// Using this function will automatically remove the event listener when this plugin is disabled.
 		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
 			console.log('click', evt);
