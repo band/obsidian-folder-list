@@ -37,17 +37,20 @@ export default class Findex extends Plugin {
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
 			const getSortedFiles = async (dir) => {
-			    return fs.readdirSync(dir).filter(item => !fs.statSync(path.join(dir,item)).isDirectory() && !item.startsWith('.') && !item.startsWith('idx-')).sort((a,b) => fs.statSync(path.join(dir,b)).mtime.getTime() - fs.statSync(path.join(dir,a)).mtime.getTime());
+			    return fs.readdirSync(dir).filter(item => fs.statSync(path.join(dir,item)).isFile() && !item.startsWith('.') && !item.startsWith('idx-')).sort((a,b) => fs.statSync(path.join(dir,b)).mtime.getTime() - fs.statSync(path.join(dir,a)).mtime.getTime());
 			};
 
 			const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
 			const findexFile = path.join(dirPath, ('idx-' + path.basename(dirPath) + '.md').toLowerCase());
 			let indexHeader = path.join(dirPath, '.indexHeading.md');
-			// TODO: handle missing indexHeader file
-			fs.copyFile(indexHeader, findexFile, () => {
-			    console.log('Header file copy successful');
-			});
-			getSortedFiles(dirPath)
+		    // TODO: handle missing indexHeader file
+		    if (fs.existsSync(indexHeader)) {
+			fs.copyFileSync(indexHeader, findexFile);
+		    } else {
+			fs.writeFileSync(findexFile, `# A list of files in ${path.basename(dirPath)}` +'\n\n', 'utf8');
+		    }
+
+		    getSortedFiles(dirPath)
 			    .then(files => {
 				console.log('the list of files: ',files)
 				console.log('the index file: ', findexFile);
@@ -108,7 +111,7 @@ export default class Findex extends Plugin {
 	    this.registerEvent(
 		this.app.vault.on('modify', (file) => {
 		    console.log('regEvent file: ', file);
-		    const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
+//		    const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
 		    const pPath = this.app.workspace.getActiveFile().parent.path;
 		    console.log('regEvent pPath: ',pPath);
 		    if (file.path.startsWith(pPath)) {
@@ -117,7 +120,7 @@ export default class Findex extends Plugin {
 		})
 	    );
 
-	    // If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
+	    // If the plugin hooks up any global DOM events (on parts of the app that do not belong to this plugin)
 		// Using this function will automatically remove the event listener when this plugin is disabled.
 		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
 			console.log('click', evt);
