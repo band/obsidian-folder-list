@@ -3,17 +3,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as util from 'util';
 
-interface FindexSettings {
-	mySetting: string;
-	omittedPaths: string[];
-}
-
-const DEFAULT_SETTINGS: FindexSettings = {
-	mySetting: 'default',
-	omittedPaths: [],
-}
-
-/*
 interface FindexData {
 	omittedPaths: string[];
 }
@@ -21,21 +10,33 @@ interface FindexData {
 const DEFAULT_DATA: FindexData = {
 	omittedPaths: [],
 };
-*/
 
-export default class Findex extends Plugin {
-	settings: FindexSettings;
-	data: FindexData;
 
-	async onload() {
+export default class FindexPlugin extends Plugin {
+	public data: FindexData;
+
+  public async loadData(): Promise<void> {
+    this.data = Object.assign(DEFAULT_DATA, await super.loadData());
+  }
+
+  public async saveData(): Promise<void> {
+    await super.saveData(this.data);
+  }
+
+  public readonly pruneOmittedFiles = async (): Promise<void> => {
+  // TODO: prune the ommittedFiles list
+  }
+
+	public async onload() {
 		console.log('Findex: loading plugin v' + this.manifest.version);
 
-		//	      await this.loadData();
-		await this.loadSettings();
+		await this.loadData();
+		//		await this.loadSettings();
 
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
+			console.log('omittedFolders?: ', this.data.omittedPaths)
 			const getSortedFiles = async (dir) => {
 				return fs.readdirSync(dir).filter(item => fs.statSync(path.join(dir, item)).isFile() && !item.startsWith('.') && !item.startsWith('idx-')).sort((a, b) => fs.statSync(path.join(dir, b)).mtime.getTime() - fs.statSync(path.join(dir, a)).mtime.getTime());
 			};
@@ -112,32 +113,24 @@ export default class Findex extends Plugin {
 	onunload() {
 
 	}
-
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
 }
 
 class FindexSettingTab extends PluginSettingTab {
-	plugin: Findex;
+private readonly plugin: FindexPlugin;
 
-	constructor(app: App, plugin: Findex) {
+	constructor(app: App, plugin: FindexPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
 
-	display(): void {
+	public display(): void {
 		const { containerEl } = this;
 
 		console.log('this.plugin ', this.plugin);
-		console.log('- plugin settings: ', this.plugin.settings);
-		console.log('- mySetting: ', this.plugin.settings.mySetting);
+		console.log('- plugin data: ', this.plugin.data);
+		//		console.log('- mySetting: ', this.plugin.settings.mySetting);
 		containerEl.empty();
-		containerEl.createEl('h2', { text: 'Folder indexing' });
+		containerEl.createEl('h2', { text: 'Findex: folder indexing' });
 
 		const fragment = document.createDocumentFragment();
 		const link = document.createElement('a');
@@ -155,13 +148,12 @@ class FindexSettingTab extends PluginSettingTab {
 				textArea.inputEl.setAttr('rows', 6);
 				textArea
 					.setPlaceholder('^daily/\n\\.png$\nfoobar.*baz')
-					//		      .setValue(this.plugin.omittedPaths.join('\n'));
-					.setValue(this.plugin.omittedPaths);
+					.setValue(this.plugin.data.omittedPaths.join('\n'));
 				textArea.inputEl.onblur = (e: FocusEvent) => {
 					const patterns = (e.target as HTMLInputElement).value;
-					this.plugin.omittedPaths = patterns.split('\n');
-					//			this.plugin.pruneOmittedFiles();
-					this.plugin.view.redraw();
+					this.plugin.data.omittedPaths = patterns.split('\n');
+					console.log(this.plugin.data.omittedPaths)
+					this.plugin.pruneOmittedFiles();
 				};
 			});
 	}
