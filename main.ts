@@ -23,7 +23,7 @@ export default class FindexPlugin extends Plugin {
   }
 
 /*
-  public readonly pruneOmittedFiles = async (): Promise<void> => {
+  public readonly cleanupOmittedFiles = async (): Promise<void> => {
   // TODO?: remove trailing '/' from folder paths
   }
 */
@@ -38,9 +38,7 @@ export default class FindexPlugin extends Plugin {
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
 			// called when the user clicks the icon.
 			const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
-			console.log(this.data.omittedFolders);
-			console.log(path.parse(dirPath));
-				// do not index omittedFolders
+			// do not index omittedFolders
 			if (this.data.omittedFolders.includes(path.parse(dirPath).name)) {
 					return;
 			}
@@ -76,19 +74,6 @@ export default class FindexPlugin extends Plugin {
 
 			new Notice(dirPath);
 		});
-		/*
-				// Perform additional things with the ribbon
-				ribbonIconEl.addClass('findex-ribbon-class');
-		
-				// This adds a simple command that can be triggered anywhere
-				this.addCommand({
-					id: 'open-sample-modal-simple',
-					name: 'Open sample modal (simple)',
-					callback: () => {
-						new SampleModal(this.app).open();
-					}
-				});
-		*/
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new FindexSettingTab(this.app, this));
@@ -106,12 +91,12 @@ export default class FindexPlugin extends Plugin {
 		);
 
 		// If the plugin hooks up any global DOM events (on parts of the app that do not belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
+		// Using this function automatically removes the event listener when this plugin is disabled.
 		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
 			console.log('click', evt);
 		});
 
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
+		// When registering intervals, this function automatically clears the interval when the plugin is disabled.
 		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
 	}
 
@@ -155,8 +140,8 @@ private readonly plugin: FindexPlugin;
    				.setValue(this.plugin.data.omittedFolders.join('\n'));
 				textArea.inputEl.onblur = (e: FocusEvent) => {
 					const patterns = (e.target as HTMLInputElement).value;
-						this.plugin.data.omittedFolders = patterns.replace(/\//g,'').split('\n');
-//					console.log(' -- ',this.plugin.data.omittedFolders);
+  				this.plugin.data.omittedFolders = patterns.split('\n').map((item) => { return item.endsWith('/') ? item.slice(0,-1) : item;});
+//				console.log(' -- ',this.plugin.data.omittedFolders);
 					this.plugin.saveData();
 				};
 			});
