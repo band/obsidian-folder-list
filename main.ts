@@ -36,15 +36,18 @@ export default class FindexPlugin extends Plugin {
 
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
+			// called when the user clicks the icon.
+			const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
+			console.log(this.data.omittedFolders);
+			console.log(path.parse(dirPath));
+				// do not index omittedFolders
+			if (this.data.omittedFolders.includes(path.parse(dirPath).name)) {
+					return;
+			}
 			const getSortedFiles = async (dir) => {
 					return fs.readdirSync(dir).filter(item => fs.statSync(path.join(dir, item)).isFile() && !item.startsWith('.') && !item.startsWith('idx-')).sort((a, b) => fs.statSync(path.join(dir, b)).mtime.getTime() - fs.statSync(path.join(dir, a)).mtime.getTime());
 			};
 
-			const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
-			if (this.data.omittedFolders.includes(this.app.workspace.getActiveFile().parent.path)) {
-					return;
-			}
 			const findexFile = path.join(dirPath, ('idx-' + path.basename(dirPath) + '.md').toLowerCase());
 			let indexHeader = path.join(dirPath, '.indexHeading.md');
 			// create index header if needed
@@ -152,8 +155,8 @@ private readonly plugin: FindexPlugin;
    				.setValue(this.plugin.data.omittedFolders.join('\n'));
 				textArea.inputEl.onblur = (e: FocusEvent) => {
 					const patterns = (e.target as HTMLInputElement).value;
-					this.plugin.data.omittedFolders = patterns.split('\n');
-					console.log(' -- ',this.plugin.data.omittedFolders);
+						this.plugin.data.omittedFolders = patterns.replace(/\//g,'').split('\n');
+//					console.log(' -- ',this.plugin.data.omittedFolders);
 					this.plugin.saveData();
 				};
 			});
