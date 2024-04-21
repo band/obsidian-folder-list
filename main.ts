@@ -1,4 +1,4 @@
-import { App, FileStat, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
+import { App, FileStats, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as util from 'util';
