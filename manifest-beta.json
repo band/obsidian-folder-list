@@ -1,0 +1,10 @@
+{
+	"id": "findex",
+	"description": "Build a list of links to files in folders.",
+	"minAppVersion": "0.15.0",
+	"name": "simple folder indexing",
+	"version": "1.0.3",
+	"author": "Bill Anderson",
+	"authorUrl": "https://about.me/wlanderson",
+	"isDesktopOnly": true
+}
