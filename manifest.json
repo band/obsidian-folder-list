@@ -1,11 +1,10 @@
 {
-	"id": "findex",
-	"name": "folder indexing",
-	"version": "1.0.2",
-	"minAppVersion": "0.15.0",
-	"description": "try to make an index of a folder.",
+	"id": "folder-list",
+	"description": "Generate folder contents files containing a list of links to files in folders.",
+	"version": "1.0.3",
+	"minAppVersion": "1.15.12",
+	"name": "simple folder listing",
 	"author": "anderbill",
 	"authorUrl": "https://about.me/wlanderson",
-	"fundingUrl": "https://obsidian.md/pricing",
-	"isDesktopOnly": false
+	"isDesktopOnly": true
 }

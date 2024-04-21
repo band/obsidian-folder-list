@@ -1,10 +1,10 @@
 {
-	"id": "findex",
-	"description": "Build a list of links to files in folders.",
-	"minAppVersion": "0.15.0",
-	"name": "simple folder indexing",
+	"id": "folder-list",
+	"description": "Generate folder contents files containing a list of links to files in folders.",
 	"version": "1.0.3",
-	"author": "Bill Anderson",
+	"minAppVersion": "1.15.12",
+	"name": "simple folder listing",
+	"author": "anderbill",
 	"authorUrl": "https://about.me/wlanderson",
 	"isDesktopOnly": true
 }
