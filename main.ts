@@ -35,12 +35,12 @@ export default class FindexPlugin extends Plugin {
 		console.log('loaded Data: ', this.data)
 
 		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
+		const ribbonIconEl = this.addRibbonIcon('list-x', 'Sample Plugin', (evt: MouseEvent) => {
 				// called when the user clicks the icon.
 			this.loadData();
 			const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
 				// do not index omittedFolders
-			if(this.data.omittedFolders.map((item) => { return path.basename(item); }).includes(path.basename(dirPath))) { return; }
+			if(this.data.omittedFolders.map(item => { return path.basename(item); }).includes(path.basename(dirPath))) { return; }
 			const getSortedFiles = async (dir) => {
 					return fs.readdirSync(dir).filter(item => fs.statSync(path.join(dir, item)).isFile() && !item.startsWith('.') && !item.startsWith('idx-')).sort((a, b) => fs.statSync(path.join(dir, b)).mtime.getTime() - fs.statSync(path.join(dir, a)).mtime.getTime());
 			};
@@ -64,7 +64,7 @@ export default class FindexPlugin extends Plugin {
 							if (err) {
 								console.error('Error writing file:', err);
 							} else {
-								console.log('File name write successful');
+								console.log('File write successful');
 							}
 						});
 					}
