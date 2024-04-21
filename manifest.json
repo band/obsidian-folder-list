@@ -1,7 +1,7 @@
 {
 	"id": "folder-list",
 	"description": "Generate folder contents files containing a list of links to files in folders.",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"minAppVersion": "1.15.12",
 	"name": "simple folder listing",
 	"author": "anderbill",
