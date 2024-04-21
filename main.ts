@@ -1,4 +1,4 @@
-import { App, FileStats, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
+import { App, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as util from 'util';
@@ -35,7 +35,7 @@ export default class FindexPlugin extends Plugin {
 		console.log('loaded Data: ', this.data)
 
 		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('list-x', 'Sample Plugin', (evt: MouseEvent) => {
+		const ribbonIconEl = this.addRibbonIcon('list-x', 'Folder Listing', (evt: MouseEvent) => {
 				// called when the user clicks the icon.
 			this.loadData();
 			const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
