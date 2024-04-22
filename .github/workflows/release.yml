@@ -20,7 +20,7 @@ jobs:
       - name: Build plugin
         run: |
           npm install
-          npm run build esbuild.config.mjs production
+          npm run build
 
       - name: Create release
         env:
