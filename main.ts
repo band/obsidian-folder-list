@@ -59,14 +59,7 @@ export default class FindexPlugin extends Plugin {
 					console.log('the list of files: ', files)
 					console.log('the index file: ', findexFile);
 					for (const i of Object.keys(files)) {
-						//				    console.log('the file: ', files[i])
-						fs.appendFileSync(findexFile, ` - [[${files[i]}]]  ` + '\n', (err) => {
-							if (err) {
-								console.error('Error writing file:', err);
-							} else {
-								console.log('File write successful');
-							}
-						});
+							fs.appendFileSync(findexFile, ` - [[${files[i]}]]  ` + '\n', 'utf-8');
 					}
 				})
 				.catch(error => console.error(error));
