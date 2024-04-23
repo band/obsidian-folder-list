@@ -1,11 +1,11 @@
 {
 	"name": "obsidian-folder-list",
 	"version": "1.0.1",
-	"description": "This is a folder indexplugin for Obsidian (https://obsidian.md)",
+	"description": "This is a folder indexing plugin for Obsidian (https://obsidian.md)",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
-		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"build": "node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
 	"keywords": [],
