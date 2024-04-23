@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-folder-list",
-	"version": "1.0.1",
+	"version": "1.0.8",
 	"description": "This is a folder indexing plugin for Obsidian (https://obsidian.md)",
 	"main": "main.js",
 	"scripts": {
