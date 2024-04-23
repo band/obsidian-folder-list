@@ -20,3 +20,21 @@
     code works  
   - then figure out if all the Obsidian Plug-in steps are worth it  
 
+### 2024-04-23:
+ - removing `tsc -noEmit -skipLibCheck` from `build:` script allowed
+   production of a draft release  
+   (what a day of trial and error go rounds)  
+   (learnings: (1) use of `tsc`; (2) still uncertain about the code
+   quality)  
+   
+ - still do not understand how to go from Release "draft" to "publish"
+   and still have all the assets needed (only the source code seems to
+   be packaged with the release). I do not understand how all these
+   parts are related to each other.  
+   
+   
+ - TODOs:
+   - test this draft release output  
+   - perhaps ready to try and use BRAT?  
+   
+
