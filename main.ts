@@ -27,26 +27,34 @@ export default class FindexPlugin extends Plugin {
   // TODO?: remove trailing '/' from folder paths
   }
 */
-		
+
 	public async onload() {
 		console.log('Findex: loading plugin v' + this.manifest.version);
 
 		await this.loadData();
 		console.log('loaded Data: ', this.data)
 
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('list-x', 'Folder Listing', (evt: MouseEvent) => {
-				// called when the user clicks the icon.
-			this.loadData();
-			const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
-				// do not index omittedFolders
-			if(this.data.omittedFolders.map(item => { return path.basename(item); }).includes(path.basename(dirPath))) { return; }
+		// Extract the index building functionality into a separate method
+		const buildFolderIndex = async (dirPath: string) => {
+			// do not index omittedFolders
+			if(this.data.omittedFolders.map(item => { return path.basename(item); }).includes(path.basename(dirPath))) { 
+				return; 
+			}
+
 			const getSortedFiles = async (dir) => {
-					return fs.readdirSync(dir).filter(item => fs.statSync(path.join(dir, item)).isFile() && !item.startsWith('.') && !item.startsWith('idx-')).sort((a, b) => fs.statSync(path.join(dir, b)).mtime.getTime() - fs.statSync(path.join(dir, a)).mtime.getTime());
+				return fs.readdirSync(dir).filter(item => 
+					fs.statSync(path.join(dir, item)).isFile() && 
+					!item.startsWith('.') && 
+					!item.startsWith('idx-')
+				).sort((a, b) => 
+					fs.statSync(path.join(dir, b)).mtime.getTime() - 
+					fs.statSync(path.join(dir, a)).mtime.getTime()
+				);
 			};
 
 			const findexFile = path.join(dirPath, ('idx-' + path.basename(dirPath) + '.md').toLowerCase());
 			let indexHeader = path.join(dirPath, '.indexHeading.md');
+
 			// create index header if needed
 			if (fs.existsSync(indexHeader)) {
 				fs.copyFileSync(indexHeader, findexFile);
@@ -54,30 +62,88 @@ export default class FindexPlugin extends Plugin {
 				fs.writeFileSync(findexFile, `# A list of files in ${path.basename(dirPath)}` + '\n\n', 'utf8');
 			}
 
-			getSortedFiles(dirPath)
-				.then(files => {
-					console.log('the list of files: ', files)
-					console.log('the index file: ', findexFile);
-					for (const i of Object.keys(files)) {
-							fs.appendFileSync(findexFile, ` - [[${files[i]}]]  ` + '\n', 'utf-8');
-					}
-				})
-				.catch(error => console.error(error));
+			try {
+				const files = await getSortedFiles(dirPath);
+				console.log('the list of files: ', files);
+				console.log('the index file: ', findexFile);
 
-			new Notice(dirPath);
+				for (const i of Object.keys(files)) {
+					fs.appendFileSync(findexFile, ` - [[${files[i]}]]  ` + '\n', 'utf-8');
+				}
+				new Notice(`Updated index for ${path.basename(dirPath)}`);
+			} catch (error) {
+				console.error("Error building index:", error);
+				new Notice(`Error updating index for ${path.basename(dirPath)}`);
+			}
+		};
+
+		// This creates an icon in the left ribbon.
+		const ribbonIconEl = this.addRibbonIcon('list-x', 'Folder Listing', (evt: MouseEvent) => {
+			// called when the user clicks the icon.
+			this.loadData();
+			const activeFile = this.app.workspace.getActiveFile();
+			if (!activeFile) {
+				new Notice('No active file selected');
+				return;
+			}
+
+			const dirPath = path.join(this.app.vault.adapter.basePath, activeFile.parent.path);
+			buildFolderIndex(dirPath);
 		});
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new FindexSettingTab(this.app, this));
 
+		// Register event for file modifications
 		this.registerEvent(
 			this.app.vault.on('modify', (file) => {
-				console.log('regEvent file: ', file);
-				//		    const dirPath = path.join(this.app.vault.adapter.basePath, this.app.workspace.getActiveFile().parent.path);
-				const pPath = this.app.workspace.getActiveFile().parent.path;
-				console.log('regEvent pPath: ', pPath);
-				if (file.path.startsWith(pPath) || pPath === "/") {
-					console.log(`File modified in ActiveFile directory: ${file.name}`);
+				if (!file || file.path.includes('idx-')) return; // Skip index files
+
+				const activeFile = this.app.workspace.getActiveFile();
+				if (!activeFile) return;
+
+				const parentPath = activeFile.parent.path;
+				const fileDirPath = file.parent?.path;
+
+				if (fileDirPath === parentPath) {
+					const dirPath = path.join(this.app.vault.adapter.basePath, parentPath);
+					buildFolderIndex(dirPath);
+				}
+			})
+		);
+
+		// Register event for file creation
+		this.registerEvent(
+			this.app.vault.on('create', (file) => {
+				if (!file || file.path.includes('idx-')) return; // Skip index files
+
+				const activeFile = this.app.workspace.getActiveFile();
+				if (!activeFile) return;
+
+				const parentPath = activeFile.parent.path;
+				const fileDirPath = file.parent?.path;
+
+				if (fileDirPath === parentPath) {
+					const dirPath = path.join(this.app.vault.adapter.basePath, parentPath);
+					buildFolderIndex(dirPath);
+				}
+			})
+		);
+
+		// Register event for file deletion
+		this.registerEvent(
+			this.app.vault.on('delete', (file) => {
+				if (!file || file.path.includes('idx-')) return; // Skip index files
+
+				const activeFile = this.app.workspace.getActiveFile();
+				if (!activeFile) return;
+
+				const parentPath = activeFile.parent.path;
+				const fileDirPath = file.parent?.path;
+
+				if (fileDirPath === parentPath) {
+					const dirPath = path.join(this.app.vault.adapter.basePath, parentPath);
+					buildFolderIndex(dirPath);
 				}
 			})
 		);
