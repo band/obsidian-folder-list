@@ -37,4 +37,10 @@
    - test this draft release output  
    - perhaps ready to try and use BRAT?  
    
-
+### 2025-04-04:
+ - it has been a year since this work paused; now the TODO is to pick
+   up where it was left; see what is new regarding Obsidian plugin
+   development; and maybe get it to work the way I envision it to
+   work.
+   
+ 
