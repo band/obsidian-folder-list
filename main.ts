@@ -45,28 +45,38 @@ export default class FindexPlugin extends Plugin {
 				return fs.readdirSync(dir).filter(item => 
 					fs.statSync(path.join(dir, item)).isFile() && 
 					!item.startsWith('.') && 
-					!item.startsWith('idx-')
+					!item.startsWith('idx-') &&
+					item.endsWith('.md')
 				).sort((a, b) => 
 					fs.statSync(path.join(dir, b)).mtime.getTime() - 
 					fs.statSync(path.join(dir, a)).mtime.getTime()
 				);
 			};
 
-			const findexFile = path.join(dirPath, ('idx-' + path.basename(dirPath) + '.md').toLowerCase());
-			let indexHeader = path.join(dirPath, '.indexHeading.md');
-
-			// create index header if needed
-			if (fs.existsSync(indexHeader)) {
-				fs.copyFileSync(indexHeader, findexFile);
-			} else {
-				fs.writeFileSync(findexFile, `# A list of files in ${path.basename(dirPath)}` + '\n\n', 'utf8');
-			}
-
 			try {
+				// Get sorted files first
 				const files = await getSortedFiles(dirPath);
+				
+				// Define index file path
+				const findexFile = path.join(dirPath, ('idx-' + path.basename(dirPath) + '.md').toLowerCase());
+				let indexHeader = path.join(dirPath, '.indexHeading.md');
+				
 				console.log('the list of files: ', files);
 				console.log('the index file: ', findexFile);
 
+					// Create or update index file with header
+				let headerContent = '';
+				if (fs.existsSync(indexHeader)) {
+					// Use custom header if it exists
+					fs.copyFileSync(indexHeader, findexFile);
+				} else {
+					// Create default header
+					headerContent = `# A list of files in ${path.basename(dirPath)}` + '\n\n';
+				}
+				// write header to index file (create it if it does not exist)
+				fs.writeFileSync(findexFile, headerContent, 'utf8');
+				
+				// Add file entries to the index
 				for (const i of Object.keys(files)) {
 					fs.appendFileSync(findexFile, ` - [[${files[i]}]]  ` + '\n', 'utf-8');
 				}
@@ -195,10 +205,10 @@ private readonly plugin: FindexPlugin;
 				textArea.inputEl.setAttr('rows', 6);
 				textArea
 					.setPlaceholder('^daily/\n\\.png$\nfoobar.*baz')
-   				.setValue(this.plugin.data.omittedFolders.join('\n'));
+	   			.setValue(this.plugin.data.omittedFolders.join('\n'));
 				textArea.inputEl.onblur = (e: FocusEvent) => {
 					const patterns = (e.target as HTMLInputElement).value;
-  				this.plugin.data.omittedFolders = patterns.split('\n').map((item) => { return item.endsWith('/') ? item.slice(0,-1) : item;});
+	  			this.plugin.data.omittedFolders = patterns.split('\n').map((item) => { return item.endsWith('/') ? item.slice(0,-1) : item;});
 //				console.log(' -- ',this.plugin.data.omittedFolders);
 					this.plugin.saveData();
 				};
