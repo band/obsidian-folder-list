@@ -100,7 +100,7 @@ export default class FindexPlugin extends Plugin {
 				return;
 			}
 
-			const dirPath = path.join(this.app.vault.adapter.basePath, activeFile.parent.path);
+			const dirPath = sanitizePath(path.join(this.app.vault.adapter.basePath, activeFile.parent.path));
 			buildFolderIndex(dirPath);
 		});
 
