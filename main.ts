@@ -22,12 +22,11 @@ export default class FindexPlugin extends Plugin {
     await super.saveData(this.data);
   }
 
-/*
-  public readonly cleanupOmittedFiles = async (): Promise<void> => {
-  // TODO?: remove trailing '/' from folder paths
-  }
-*/
-
+	private sanitizePath(path: string): string {
+	// Remove any characters that could be used for path traversal
+		return path.replace(/\.\.\//g, '').replace(/[<>:"|?*]/g, '');
+	}
+		
 	public async onload() {
 		console.log('Findex: loading plugin v' + this.manifest.version);
 
@@ -41,17 +40,17 @@ export default class FindexPlugin extends Plugin {
 				return; 
 			}
 
-			const getSortedFiles = async (dir) => {
-				return fs.readdirSync(dir).filter(item => 
-					fs.statSync(path.join(dir, item)).isFile() && 
-					!item.startsWith('.') && 
-					!item.startsWith('idx-') &&
-					item.endsWith('.md')
-				).sort((a, b) => 
-					fs.statSync(path.join(dir, b)).mtime.getTime() - 
-					fs.statSync(path.join(dir, a)).mtime.getTime()
-				);
-			};
+				const getSortedFiles = async (dir: string): Promise<string[]> => {
+						return fs.readdirSync(dir).filter(item => 
+								fs.statSync(path.join(dir, item)).isFile() && 
+										!item.startsWith('.') && 
+										!item.startsWith('idx-') &&
+										item.endsWith('.md')
+						).sort((a, b) => 
+								fs.statSync(path.join(dir, b)).mtime.getTime() - 
+  									fs.statSync(path.join(dir, a)).mtime.getTime()
+						);
+				};
 
 			try {
 				// Get sorted files first
@@ -74,9 +73,13 @@ export default class FindexPlugin extends Plugin {
 					headerContent = `# A list of files in ${path.basename(dirPath)}` + '\n\n';
 				}
 				// write header to index file (create it if it does not exist)
-				fs.writeFileSync(findexFile, headerContent, 'utf8');
+//				const vaultRootPath = app.vault.adapter.getBasePath()
+//				const relativeFindexfile = findexFile.replace(vaultRootPath, '')
+//				await this.app.vault.create(relativeFindexFile, headerContent)
+				fs.writeFileSync(findexFile, headerContent, 'utf8')
 				
 				// Add file entries to the index
+				console.log('findexFile ',findexFile)
 				for (const i of Object.keys(files)) {
 					fs.appendFileSync(findexFile, ` - [[${files[i]}]]  ` + '\n', 'utf-8');
 				}
@@ -104,59 +107,25 @@ export default class FindexPlugin extends Plugin {
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new FindexSettingTab(this.app, this));
 
-		// Register event for file modifications
-		this.registerEvent(
-			this.app.vault.on('modify', (file) => {
-				if (!file || file.path.includes('idx-')) return; // Skip index files
+		const handleFileEvent = (file: any) => {
+			console.log('file.path ',file.path)
+			if (!file || file.path.includes('idx-')) return;
 
-				const activeFile = this.app.workspace.getActiveFile();
+			const activeFile = this.app.workspace.getActiveFile();
 				if (!activeFile) return;
 
-				const parentPath = activeFile.parent.path;
-				const fileDirPath = file.parent?.path;
-
-				if (fileDirPath === parentPath) {
-					const dirPath = path.join(this.app.vault.adapter.basePath, parentPath);
-					buildFolderIndex(dirPath);
+			const parentPath = activeFile.parent.path;
+				if (file.parent?.path == parentPath) {
+						const dirPath = path.join(this.app.vault.adapter.basePath, parentPath);
+						buildFolderIndex(dirPath);
 				}
-			})
-		);
+		};
 
-		// Register event for file creation
-		this.registerEvent(
-			this.app.vault.on('create', (file) => {
-				if (!file || file.path.includes('idx-')) return; // Skip index files
-
-				const activeFile = this.app.workspace.getActiveFile();
-				if (!activeFile) return;
-
-				const parentPath = activeFile.parent.path;
-				const fileDirPath = file.parent?.path;
-
-				if (fileDirPath === parentPath) {
-					const dirPath = path.join(this.app.vault.adapter.basePath, parentPath);
-					buildFolderIndex(dirPath);
-				}
-			})
-		);
-
-		// Register event for file deletion
-		this.registerEvent(
-			this.app.vault.on('delete', (file) => {
-				if (!file || file.path.includes('idx-')) return; // Skip index files
-
-				const activeFile = this.app.workspace.getActiveFile();
-				if (!activeFile) return;
-
-				const parentPath = activeFile.parent.path;
-				const fileDirPath = file.parent?.path;
-
-				if (fileDirPath === parentPath) {
-					const dirPath = path.join(this.app.vault.adapter.basePath, parentPath);
-					buildFolderIndex(dirPath);
-				}
-			})
-		);
+		
+		// Register event for file ops using common handler
+		this.registerEvent(this.app.vault.on('modify', handleFileEvent));
+		this.registerEvent(this.app.vault.on('create', handleFileEvent));
+		this.registerEvent(this.app.vault.on('delete', handleFileEvent));
 
 		// If the plugin hooks up any global DOM events (on parts of the app that do not belong to this plugin)
 		// Using this function automatically removes the event listener when this plugin is disabled.
