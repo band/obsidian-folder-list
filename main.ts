@@ -26,11 +26,6 @@ export default class FindexPlugin extends Plugin {
     await super.saveData(this.data);
   }
 
-	private sanitizePath(path: string): string {
-	// Remove characters that can be used for path traversal
-		return path.replace(/\.\.\//g, '').replace(/[<>:"|?*]/g, '');
-	}
-
 	private log(message: string, ...args: any[]): void {
 		if (this.data.debug) {
 				console.log(`[Findex] ${message}`, ...args);
@@ -107,7 +102,6 @@ export default class FindexPlugin extends Plugin {
 				return;
 			}
 
-//			const dirPath = sanitizePath(path.join(this.app.vault.adapter.basePath, activeFile.parent.path));
 			const dirPath = path.join(this.app.vault.adapter.basePath, activeFile.parent.path)
 			buildFolderIndex(dirPath);
 		});
@@ -132,7 +126,7 @@ export default class FindexPlugin extends Plugin {
 						this.updateDebounceTimers[dirPath] = setTimeout(() => {
 								buildFolderIndex(dirPath);
 								delete this.updateDebounceTimers[dirPath];
-						}, 3000);
+						}, 3000);  // 3 second delay
 				}
 		};
 		
