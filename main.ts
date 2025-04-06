@@ -4,14 +4,18 @@ import * as path from 'path';
 import * as util from 'util';
 
 interface FindexData {
-	omittedFolders: string[];
+		omittedFolders: string[];
+		debug: boolean;
 }
 
 const DEFAULT_DATA: FindexData = {
-	omittedFolders: [],
+		omittedFolders: [],
+		debug: false,
 };
 
 export default class FindexPlugin extends Plugin {
+	private updateDebounceTimers: Record<string, NodeJS.Timeout> = {};
+		
 	public data: FindexData;
 
   public async loadData(): Promise<void> {
@@ -23,15 +27,21 @@ export default class FindexPlugin extends Plugin {
   }
 
 	private sanitizePath(path: string): string {
-	// Remove any characters that could be used for path traversal
+	// Remove characters that can be used for path traversal
 		return path.replace(/\.\.\//g, '').replace(/[<>:"|?*]/g, '');
+	}
+
+	private log(message: string, ...args: any[]): void {
+		if (this.data.debug) {
+				console.log(`[Findex] ${message}`, ...args);
+		}
 	}
 		
 	public async onload() {
 		console.log('Findex: loading plugin v' + this.manifest.version);
 
 		await this.loadData();
-		console.log('loaded Data: ', this.data)
+		this.log('loaded Data: ', this.data)
 
 		// Extract the index building functionality into a separate method
 		const buildFolderIndex = async (dirPath: string) => {
@@ -60,8 +70,8 @@ export default class FindexPlugin extends Plugin {
 				const findexFile = path.join(dirPath, ('idx-' + path.basename(dirPath) + '.md').toLowerCase());
 				let indexHeader = path.join(dirPath, '.indexHeading.md');
 				
-				console.log('the list of files: ', files);
-				console.log('the index file: ', findexFile);
+				this.log('the list of files: ', files);
+				this.log('the index file: ', findexFile);
 
 					// Create or update index file with header
 				let headerContent = '';
@@ -76,7 +86,7 @@ export default class FindexPlugin extends Plugin {
 				fs.writeFileSync(findexFile, headerContent, 'utf8')
 				
 				// Add file entries to the index
-				console.log('findexFile ',findexFile)
+				this.log('findexFile ',findexFile)
 				for (const i of Object.keys(files)) {
 					fs.appendFileSync(findexFile, ` - [[${files[i]}]]  ` + '\n', 'utf-8');
 				}
@@ -115,10 +125,16 @@ export default class FindexPlugin extends Plugin {
 			const parentPath = activeFile.parent.path;
 				if (file.parent?.path == parentPath) {
 						const dirPath = path.join(this.app.vault.adapter.basePath, parentPath);
-						buildFolderIndex(dirPath);
+						if (this.updateDebounceTimers[dirPath]) {
+								clearTimeout(this.updateDebounceTimers[dirPath]);
+						}
+
+						this.updateDebounceTimers[dirPath] = setTimeout(() => {
+								buildFolderIndex(dirPath);
+								delete this.updateDebounceTimers[dirPath];
+						}, 3000);
 				}
 		};
-
 		
 		// Register event for file ops using common handler
 		this.registerEvent(this.app.vault.on('modify', handleFileEvent));
@@ -126,6 +142,7 @@ export default class FindexPlugin extends Plugin {
 		this.registerEvent(this.app.vault.on('delete', handleFileEvent));
 		this.registerEvent(this.app.vault.on('rename', handleFileEvent))
 
+		this.addSettingTab(new FindexSettingTab(this.app, this))
 		// If the plugin hooks up any global DOM events (on parts of the app that do not belong to this plugin)
 		// Using this function automatically removes the event listener when this plugin is disabled.
 		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
@@ -141,7 +158,7 @@ export default class FindexPlugin extends Plugin {
 }
 
 class FindexSettingTab extends PluginSettingTab {
-private readonly plugin: FindexPlugin;
+	private readonly plugin: FindexPlugin;
 
 	constructor(app: App, plugin: FindexPlugin) {
 		super(app, plugin);
@@ -181,5 +198,17 @@ private readonly plugin: FindexPlugin;
 					this.plugin.saveData();
 				};
 			});
+
+    // Add debug toggle
+    new Setting(containerEl)
+      .setName('Enable debug mode')
+      .setDesc('When enabled, detailed logs will be printed to the developer console')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.data.debug)
+        .onChange(async (value) => {
+          this.plugin.data.debug = value;
+          await this.plugin.saveData();
+        })
+      );
 	}
 }
