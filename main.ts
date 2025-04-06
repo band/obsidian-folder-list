@@ -110,7 +110,7 @@ export default class FindexPlugin extends Plugin {
 		this.addSettingTab(new FindexSettingTab(this.app, this));
 
 		const handleFileEvent = (file: any) => {
-			console.log('file.path ',file.path)
+			this.log('file.path ',file.path)
 			if (!file || file.path.includes('idx-')) return;
 
 			const activeFile = this.app.workspace.getActiveFile();
@@ -140,7 +140,7 @@ export default class FindexPlugin extends Plugin {
 		// If the plugin hooks up any global DOM events (on parts of the app that do not belong to this plugin)
 		// Using this function automatically removes the event listener when this plugin is disabled.
 		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
+//			this.log('click', evt);
 		});
 
 		// When registering intervals, this function automatically clears the interval when the plugin is disabled.
