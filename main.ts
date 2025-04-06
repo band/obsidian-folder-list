@@ -73,9 +73,6 @@ export default class FindexPlugin extends Plugin {
 					headerContent = `# A list of files in ${path.basename(dirPath)}` + '\n\n';
 				}
 				// write header to index file (create it if it does not exist)
-//				const vaultRootPath = app.vault.adapter.getBasePath()
-//				const relativeFindexfile = findexFile.replace(vaultRootPath, '')
-//				await this.app.vault.create(relativeFindexFile, headerContent)
 				fs.writeFileSync(findexFile, headerContent, 'utf8')
 				
 				// Add file entries to the index
@@ -100,7 +97,8 @@ export default class FindexPlugin extends Plugin {
 				return;
 			}
 
-			const dirPath = sanitizePath(path.join(this.app.vault.adapter.basePath, activeFile.parent.path));
+//			const dirPath = sanitizePath(path.join(this.app.vault.adapter.basePath, activeFile.parent.path));
+			const dirPath = path.join(this.app.vault.adapter.basePath, activeFile.parent.path)
 			buildFolderIndex(dirPath);
 		});
 
@@ -126,6 +124,7 @@ export default class FindexPlugin extends Plugin {
 		this.registerEvent(this.app.vault.on('modify', handleFileEvent));
 		this.registerEvent(this.app.vault.on('create', handleFileEvent));
 		this.registerEvent(this.app.vault.on('delete', handleFileEvent));
+		this.registerEvent(this.app.vault.on('rename', handleFileEvent))
 
 		// If the plugin hooks up any global DOM events (on parts of the app that do not belong to this plugin)
 		// Using this function automatically removes the event listener when this plugin is disabled.
