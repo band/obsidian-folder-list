@@ -1,8 +1,8 @@
 import type { App, Setting } from 'obsidian';
-import { Notice, Plugin, PluginSettingTab } from 'obsidian';
+import { Notice, Plugin, PluginSettingTab, TAbstractFile } from 'obsidian';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as util from 'util';
+
 
 interface FindexData {
   omittedFolders: string[];
@@ -34,7 +34,7 @@ export default class FindexPlugin extends Plugin {
   }
 
   public async onload() {
-    console.log('Findex: loading plugin v' + this.manifest.version);
+    console.log(`Findex: loading plugin v${this.manifest.version}`);
 
     await this.loadData();
     this.log('loaded Data: ', this.data);
@@ -76,9 +76,9 @@ export default class FindexPlugin extends Plugin {
         // Define index file path
         const findexFile = path.join(
           dirPath,
-          ('idx-' + path.basename(dirPath) + '.md').toLowerCase()
+          `idx-${path.basename(dirPath)}.md`.toLowerCase()
         );
-        let indexHeader = path.join(dirPath, '.indexHeading.md');
+        const indexHeader = path.join(dirPath, '.indexHeading.md');
 
         this.log('the list of files: ', files);
         this.log('the index file: ', findexFile);
@@ -91,7 +91,7 @@ export default class FindexPlugin extends Plugin {
         } else {
           // Create default header
           headerContent =
-            `# A list of files in ${path.basename(dirPath)}` + '\n\n';
+            `# A list of files in ${path.basename(dirPath)}\n\n`;
         }
         // write header to index file (create it if it does not exist)
         fs.writeFileSync(findexFile, headerContent, 'utf8');
@@ -99,7 +99,7 @@ export default class FindexPlugin extends Plugin {
         // Add file entries to the index
         this.log('findexFile ', findexFile);
         for (const i of Object.keys(files)) {
-          fs.appendFileSync(findexFile, ` - [[${files[i]}]]  ` + '\n', 'utf-8');
+          fs.appendFileSync(findexFile, ` - [[${files[Number(i)]}]]\n`, 'utf-8');
         }
         new Notice(`Updated index for ${path.basename(dirPath)}`);
       } catch (error) {
@@ -129,18 +129,16 @@ export default class FindexPlugin extends Plugin {
       }
     );
 
-    // This adds a settings tab so the user can configure various aspects of the plugin
-    this.addSettingTab(new FindexSettingTab(this.app, this));
-
-    const handleFileEvent = (file: any) => {
+    const handleFileEvent = (file: TAbstractFile) => {
       this.log('file.path ', file.path);
       if (!file || file.path.includes('idx-')) return;
 
       const activeFile = this.app.workspace.getActiveFile();
       if (!activeFile) return;
 
-      const parentPath = activeFile.parent.path;
-      if (file.parent?.path == parentPath) {
+      const parentPath = activeFile.parent?.path;
+      if (!parentPath) return;
+      if (file.parent?.path === parentPath) {
         const dirPath = path.join(this.app.vault.adapter.basePath, parentPath);
         if (this.updateDebounceTimers[dirPath]) {
           clearTimeout(this.updateDebounceTimers[dirPath]);
@@ -160,7 +158,7 @@ export default class FindexPlugin extends Plugin {
           if (files.length === 0) {
             const findexFile = path.join(
               dirPath,
-              ('idx-' + path.basename(dirPath) + '.md').toLowerCase()
+              `idx-${path.basename(dirPath)}.md`.toLowerCase()
             );
             if (fs.existsSync(findexFile)) {
               fs.unlinkSync(findexFile);
@@ -182,8 +180,10 @@ export default class FindexPlugin extends Plugin {
     this.registerEvent(this.app.vault.on('delete', handleFileEvent));
     this.registerEvent(this.app.vault.on('rename', handleFileEvent));
 
-    this.addSettingTab(new FindexSettingTab(this.app, this));
-    // If the plugin hooks up any global DOM events (on parts of the app that do not belong to this plugin)
+	// This adds a settings tab so the user can configure various aspects of the plugin
+	this.addSettingTab(new FindexSettingTab(this.app, this));
+ 
+	// If the plugin hooks up any global DOM events (on parts of the app that do not belong to this plugin)
     // Using this function automatically removes the event listener when this plugin is disabled.
     this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
       //			this.log('click', evt);
