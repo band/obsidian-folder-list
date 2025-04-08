@@ -1,8 +1,7 @@
 import type { App, Setting } from 'obsidian';
-import { Notice, Plugin, PluginSettingTab, TAbstractFile } from 'obsidian';
+import { Notice, Plugin, PluginSettingTab, TFile } from 'obsidian';
 import * as fs from 'fs';
 import * as path from 'path';
-
 
 interface FindexData {
   omittedFolders: string[];
@@ -33,6 +32,19 @@ export default class FindexPlugin extends Plugin {
     }
   }
 
+  private isFolderEmpty(dirPath: string): boolean {
+    this.log(`isFolderEmpty - ${dirPath}`);
+    const files = fs
+      .readdirSync(dirPath)
+      .filter(
+        (item) =>
+          fs.statSync(path.join(dirPath, item)).isFile() &&
+          !item.startsWith('.') &&
+          !item.startsWith('idx-')
+      );
+    return files.length === 0;
+  }
+
   public async onload() {
     console.log(`Findex: loading plugin v${this.manifest.version}`);
 
@@ -41,59 +53,50 @@ export default class FindexPlugin extends Plugin {
 
     // Extract the index building functionality into a separate method
     const buildFolderIndex = async (dirPath: string) => {
-      // do not index omittedFolders
       if (
         this.data.omittedFolders
-          .map((item) => {
-            return path.basename(item);
-          })
+          .map((item) => path.basename(item))
           .includes(path.basename(dirPath))
       ) {
         return;
       }
 
-	  const getSortedFiles = async (dir: string): Promise<string[]> => {
-		const filesInDir = fs.readdirSync(dir);
-		return filesInDir
-		  .filter((item) => !item.startsWith('idx-') && item.endsWith('.md'))
-		  .sort((a, b) => 
-			fs.statSync(path.join(dir, b)).mtime.getTime() -
-			fs.statSync(path.join(dir, a)).mtime.getTime()
-		  );
-	  };
+      const getSortedFiles = async (dir: string): Promise<string[]> => {
+        const filesInDir = fs.readdirSync(dir);
+        return filesInDir
+          .filter((item) => !item.startsWith('idx-') && item.endsWith('.md'))
+          .sort(
+            (a, b) =>
+              fs.statSync(path.join(dir, b)).mtime.getTime() -
+              fs.statSync(path.join(dir, a)).mtime.getTime()
+          );
+      };
 
       try {
-        // Get sorted files first
         const files = await getSortedFiles(dirPath);
 
-        // Define index file path
         const findexFile = path.join(
           dirPath,
           `idx-${path.basename(dirPath)}.md`.toLowerCase()
         );
         const indexHeader = path.join(dirPath, '.indexHeading.md');
 
-        this.log('the list of files: ', files);
-        this.log('the index file: ', findexFile);
+        this.log('The list of files:', files);
+        this.log('The index file:', findexFile);
 
-        // Create or update index file with header
         let headerContent = '';
         if (fs.existsSync(indexHeader)) {
-          // Use custom header if it exists
           fs.copyFileSync(indexHeader, findexFile);
         } else {
-          // Create default header
-          headerContent =
-            `# A list of files in ${path.basename(dirPath)}\n\n`;
+          headerContent = `# A list of files in ${path.basename(dirPath)}\n\n`;
         }
-        // write header to index file (create it if it does not exist)
+
         fs.writeFileSync(findexFile, headerContent, 'utf8');
 
-        // Add file entries to the index
-        this.log('findexFile ', findexFile);
         for (const file of files) {
-			fs.appendFileSync(findexFile, ` - [[${file}]]\n`, 'utf-8');
-		  }
+          fs.appendFileSync(findexFile, ` - [[${file}]]\n`, 'utf-8');
+        }
+
         new Notice(`Updated index for ${path.basename(dirPath)}`);
       } catch (error) {
         console.error('Error building index:', error);
@@ -118,53 +121,61 @@ export default class FindexPlugin extends Plugin {
           this.app.vault.getRoot().path,
           activeFile.parent?.path ?? ''
         );
-		this.log('ribbonIconEL - dirPath ', dirPath);
+        this.log('ribbonIconEL - dirPath ', dirPath);
         buildFolderIndex(dirPath);
       }
     );
 
-    const handleFileEvent = (file: TAbstractFile) => {
-      this.log('handleFileEvent - file.path ', file.path);
-				if (!file || file.path.includes('idx-') || file.path.endsWith('.indexHeading.md')) return;
+    const handleFileEvent = (file: TFile) => {
+      this.log('handleFileEvent - file.path', file.path);
+
+      if (
+        !file ||
+        file.path.includes('idx-') ||
+        file.path.endsWith('.indexHeading.md')
+      ) {
+        return;
+      }
 
       const activeFile = this.app.workspace.getActiveFile();
-      if (!activeFile) return;
+      if (!activeFile) {
+        return;
+      }
 
       const parentPath = activeFile.parent?.path;
-      if (!parentPath) return;
+      if (!parentPath) {
+        return;
+      }
+
       if (file.parent?.path === parentPath) {
-        const dirPath = path.join(this.app.vault.adapter.basePath, parentPath);
+        const dirPath = path.join(
+          this.app.vault.adapter.getResourcePath(''),
+          parentPath
+        );
+
         if (this.updateDebounceTimers[dirPath]) {
           clearTimeout(this.updateDebounceTimers[dirPath]);
         }
 
         this.updateDebounceTimers[dirPath] = setTimeout(() => {
-          // is directory empty?
-          const files = fs
-            .readdirSync(dirPath)
-            .filter(
-              (item) =>
-                fs.statSync(path.join(dirPath, item)).isFile() &&
-                !item.startsWith('.') &&
-                !item.startsWith('idx-')
-            );
-
-          if (files.length === 0) {
+          if (this.isFolderEmpty(dirPath)) {
             const findexFile = path.join(
               dirPath,
               `idx-${path.basename(dirPath)}.md`.toLowerCase()
             );
+
             if (fs.existsSync(findexFile)) {
               fs.unlinkSync(findexFile);
-              this.log('deleted index file: ', findexFile);
+              this.log('Deleted index file:', findexFile);
               new Notice(`Deleted index for ${path.basename(dirPath)}`);
             }
           } else {
-            // rebuild index if directory not empty
+            // Rebuild index if directory is not empty
             buildFolderIndex(dirPath);
           }
+
           delete this.updateDebounceTimers[dirPath];
-        }, 3000); // 3 second delay
+        }, 3000); // 3-second delay
       }
     };
 
@@ -174,10 +185,10 @@ export default class FindexPlugin extends Plugin {
     this.registerEvent(this.app.vault.on('delete', handleFileEvent));
     this.registerEvent(this.app.vault.on('rename', handleFileEvent));
 
-	// This adds a settings tab so the user can configure various aspects of the plugin
-	this.addSettingTab(new FindexSettingTab(this.app, this));
- 
-	// If the plugin hooks up any global DOM events (on parts of the app that do not belong to this plugin)
+    // This adds a settings tab so the user can configure various aspects of the plugin
+    this.addSettingTab(new FindexSettingTab(this.app, this));
+
+    // If the plugin hooks up any global DOM events (on parts of the app that do not belong to this plugin)
     // Using this function automatically removes the event listener when this plugin is disabled.
     this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
       //			this.log('click', evt);
