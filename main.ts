@@ -1,5 +1,13 @@
-import type { App, Setting } from 'obsidian';
-import { Notice, Plugin, PluginSettingTab, TFile } from 'obsidian';
+import {
+  App,
+  Notice,
+  Plugin,
+  PluginSettingTab,
+  Setting,
+  TAbstractFile,
+  TFile,
+  TFolder,
+} from 'obsidian';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -32,17 +40,44 @@ export default class FindexPlugin extends Plugin {
     }
   }
 
-  private isFolderEmpty(dirPath: string): boolean {
+  private async isFolderEmpty(dirPath: string): Promise<boolean> {
     this.log(`isFolderEmpty - ${dirPath}`);
-    const files = fs
-      .readdirSync(dirPath)
-      .filter(
-        (item) =>
-          fs.statSync(path.join(dirPath, item)).isFile() &&
-          !item.startsWith('.') &&
-          !item.startsWith('idx-')
-      );
+    const folder = this.app.vault.getAbstractFileByPath(dirPath);
+    if (!(folder instanceof TFolder)) {
+      throw new Error(`${dirPath} is not a folder`);
+    }
+
+    const files = folder.children.filter(
+      (item) => item instanceof TFile && !item.name.startsWith('idx-')
+    );
+
     return files.length === 0;
+  }
+
+  private async writeFile(filePath: string, content: string): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(filePath);
+    if (file instanceof TFile) {
+      await this.app.vault.modify(file, content);
+    } else {
+      await this.app.vault.create(filePath, content);
+    }
+  }
+
+  private async appendToFile(filePath: string, content: string): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(filePath);
+    if (file instanceof TFile) {
+      const existingContent = await this.app.vault.read(file);
+      await this.app.vault.modify(file, existingContent + content);
+    } else {
+      await this.app.vault.create(filePath, content);
+    }
+  }
+
+  private async deleteFile(filePath: string): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(filePath);
+    if (file instanceof TFile) {
+      await this.app.vault.delete(file);
+    }
   }
 
   public async onload() {
@@ -62,13 +97,21 @@ export default class FindexPlugin extends Plugin {
       }
 
       const getSortedFiles = async (dir: string): Promise<string[]> => {
-        const filesInDir = fs.readdirSync(dir);
+        const folder = this.app.vault.getAbstractFileByPath(dir);
+        if (!(folder instanceof TFolder)) {
+          throw new Error(`${dir} is not a folder`);
+        }
+
+        const filesInDir = folder.children.filter(
+          (item) => item instanceof TFile && item.extension === 'md'
+        ) as TFile[];
+
         return filesInDir
-          .filter((item) => !item.startsWith('idx-') && item.endsWith('.md'))
+          .map((file) => file.path)
           .sort(
             (a, b) =>
-              fs.statSync(path.join(dir, b)).mtime.getTime() -
-              fs.statSync(path.join(dir, a)).mtime.getTime()
+              (this.app.vault.getAbstractFileByPath(b) as TFile)?.stat.mtime -
+              (this.app.vault.getAbstractFileByPath(a) as TFile)?.stat.mtime
           );
       };
 
@@ -85,16 +128,19 @@ export default class FindexPlugin extends Plugin {
         this.log('The index file:', findexFile);
 
         let headerContent = '';
-        if (fs.existsSync(indexHeader)) {
-          fs.copyFileSync(indexHeader, findexFile);
+        if (this.app.vault.getAbstractFileByPath(indexHeader)) {
+          const headerFile = this.app.vault.getAbstractFileByPath(
+            indexHeader
+          ) as TFile;
+          headerContent = await this.app.vault.read(headerFile);
         } else {
           headerContent = `# A list of files in ${path.basename(dirPath)}\n\n`;
         }
 
-        fs.writeFileSync(findexFile, headerContent, 'utf8');
+        await this.writeFile(findexFile, headerContent);
 
         for (const file of files) {
-          fs.appendFileSync(findexFile, ` - [[${file}]]\n`, 'utf-8');
+          await this.appendToFile(findexFile, ` - [[${file}]]\n`);
         }
 
         new Notice(`Updated index for ${path.basename(dirPath)}`);
@@ -126,7 +172,7 @@ export default class FindexPlugin extends Plugin {
       }
     );
 
-    const handleFileEvent = (file: TFile) => {
+    const handleFileEvent = async (file: TAbstractFile) => {
       this.log('handleFileEvent - file.path', file.path);
 
       if (
@@ -148,30 +194,27 @@ export default class FindexPlugin extends Plugin {
       }
 
       if (file.parent?.path === parentPath) {
-        const dirPath = path.join(
-          this.app.vault.adapter.getResourcePath(''),
-          parentPath
-        );
+        const dirPath = parentPath;
 
         if (this.updateDebounceTimers[dirPath]) {
           clearTimeout(this.updateDebounceTimers[dirPath]);
         }
 
-        this.updateDebounceTimers[dirPath] = setTimeout(() => {
-          if (this.isFolderEmpty(dirPath)) {
+        this.updateDebounceTimers[dirPath] = setTimeout(async () => {
+          if (await this.isFolderEmpty(dirPath)) {
             const findexFile = path.join(
               dirPath,
               `idx-${path.basename(dirPath)}.md`.toLowerCase()
             );
 
-            if (fs.existsSync(findexFile)) {
-              fs.unlinkSync(findexFile);
+            if (this.app.vault.getAbstractFileByPath(findexFile)) {
+              await this.deleteFile(findexFile);
               this.log('Deleted index file:', findexFile);
               new Notice(`Deleted index for ${path.basename(dirPath)}`);
             }
           } else {
             // Rebuild index if directory is not empty
-            buildFolderIndex(dirPath);
+            await buildFolderIndex(dirPath);
           }
 
           delete this.updateDebounceTimers[dirPath];
