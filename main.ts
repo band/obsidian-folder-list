@@ -27,7 +27,7 @@ export default class FindexPlugin extends Plugin {
     await super.saveData(this.data);
   }
 
-  private log(message: string, ...args: any[]): void {
+  private log(message: string, ...args: unknown[]): void {
     if (this.data.debug) {
       console.log(`[Findex] ${message}`, ...args);
     }
@@ -122,9 +122,10 @@ export default class FindexPlugin extends Plugin {
         }
 
         const dirPath = path.join(
-          this.app.vault.adapter.basePath,
-          activeFile.parent.path
+          this.app.vault.getRoot().path,
+          activeFile.parent?.path ?? ''
         );
+		this.log('dirPath ', dirPath);
         buildFolderIndex(dirPath);
       }
     );
