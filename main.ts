@@ -52,22 +52,15 @@ export default class FindexPlugin extends Plugin {
         return;
       }
 
-      const getSortedFiles = async (dir: string): Promise<string[]> => {
-        return fs
-          .readdirSync(dir)
-          .filter(
-            (item) =>
-              fs.statSync(path.join(dir, item)).isFile() &&
-              !item.startsWith('.') &&
-              !item.startsWith('idx-') &&
-              item.endsWith('.md')
-          )
-          .sort(
-            (a, b) =>
-              fs.statSync(path.join(dir, b)).mtime.getTime() -
-              fs.statSync(path.join(dir, a)).mtime.getTime()
-          );
-      };
+	  const getSortedFiles = async (dir: string): Promise<string[]> => {
+		const filesInDir = fs.readdirSync(dir);
+		return filesInDir
+		  .filter((item) => !item.startsWith('idx-') && item.endsWith('.md'))
+		  .sort((a, b) => 
+			fs.statSync(path.join(dir, b)).mtime.getTime() -
+			fs.statSync(path.join(dir, a)).mtime.getTime()
+		  );
+	  };
 
       try {
         // Get sorted files first
@@ -98,9 +91,9 @@ export default class FindexPlugin extends Plugin {
 
         // Add file entries to the index
         this.log('findexFile ', findexFile);
-        for (const i of Object.keys(files)) {
-          fs.appendFileSync(findexFile, ` - [[${files[Number(i)]}]]\n`, 'utf-8');
-        }
+        for (const file of files) {
+			fs.appendFileSync(findexFile, ` - [[${file}]]\n`, 'utf-8');
+		  }
         new Notice(`Updated index for ${path.basename(dirPath)}`);
       } catch (error) {
         console.error('Error building index:', error);
@@ -125,14 +118,14 @@ export default class FindexPlugin extends Plugin {
           this.app.vault.getRoot().path,
           activeFile.parent?.path ?? ''
         );
-		this.log('dirPath ', dirPath);
+		this.log('ribbonIconEL - dirPath ', dirPath);
         buildFolderIndex(dirPath);
       }
     );
 
     const handleFileEvent = (file: TAbstractFile) => {
-      this.log('file.path ', file.path);
-      if (!file || file.path.includes('idx-')) return;
+      this.log('handleFileEvent - file.path ', file.path);
+				if (!file || file.path.includes('idx-') || file.path.endsWith('.indexHeading.md')) return;
 
       const activeFile = this.app.workspace.getActiveFile();
       if (!activeFile) return;
@@ -155,7 +148,7 @@ export default class FindexPlugin extends Plugin {
                 !item.startsWith('.') &&
                 !item.startsWith('idx-')
             );
-          this.log;
+
           if (files.length === 0) {
             const findexFile = path.join(
               dirPath,
