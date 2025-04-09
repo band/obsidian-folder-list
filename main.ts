@@ -89,10 +89,10 @@ export default class FindexPlugin extends Plugin {
 				// Extract the index building functionality into a separate method
 				const buildFolderIndex = async (dirPath: string) => {
 						const folder = this.app.vault.getAbstractFileByPath(dirPath)
-						if (!(folder instanceofTFolder)) {
+						if (!(folder instanceof TFolder)) {
 								new Notice(`${dirPath} is not a valid folder`)
 								return
-						})
+						}
 								
 								if (
 										this.data.omittedFolders
