@@ -1,322 +1,319 @@
 import {
-		App,
-		Notice,
-		Plugin,
-		PluginSettingTab,
-		Setting,
-		TAbstractFile,
-		TFile,
-		TFolder,
-} from 'obsidian';
-import * as fs from 'fs';
-import * as path from 'path';
+  App,
+  Notice,
+  Plugin,
+  PluginSettingTab,
+  Setting,
+  TAbstractFile,
+  TFile,
+  TFolder,
+} from 'obsidian'
+import * as fs from 'fs'
+import * as path from 'path'
 
 interface FindexData {
-		omittedFolders: string[];
-		debug: boolean;
+  omittedFolders: string[]
+  debug: boolean
 }
 
 const DEFAULT_DATA: FindexData = {
-		omittedFolders: [],
-		debug: false,
-};
+  omittedFolders: [],
+  debug: false,
+}
 
 export default class FindexPlugin extends Plugin {
-		private updateDebounceTimers: Record<string, NodeJS.Timeout> = {};
+  private updateDebounceTimers: Record<string, NodeJS.Timeout> = {}
 
-		public data: FindexData;
+  public data: FindexData
 
-		public async loadData(): Promise<void> {
-				this.data = Object.assign(DEFAULT_DATA, await super.loadData());
-		}
+  public async loadData(): Promise<void> {
+    this.data = Object.assign(DEFAULT_DATA, await super.loadData())
+  }
 
-		public async saveData(): Promise<void> {
-				await super.saveData(this.data);
-		}
+  public async saveData(): Promise<void> {
+    await super.saveData(this.data)
+  }
 
-		private log(message: string, ...args: unknown[]): void {
-				if (this.data.debug) {
-						console.log(`[Findex] ${message}`, ...args);
-				}
-		}
+  private log(message: string, ...args: unknown[]): void {
+    if (this.data.debug) {
+      console.log(`[Findex] ${message}`, ...args)
+    }
+  }
 
-		private async isFolderEmpty(dirPath: string): Promise<boolean> {
-				this.log(`isFolderEmpty - ${dirPath}`);
-				const folder = this.app.vault.getAbstractFileByPath(dirPath);
-				if (!(folder instanceof TFolder)) {
-						throw new Error(`${dirPath} is not a folder`);
-				}
+  private async isFolderEmpty(dirPath: string): Promise<boolean> {
+    this.log(`isFolderEmpty - ${dirPath}`)
+    const folder = this.app.vault.getAbstractFileByPath(dirPath)
+    if (!(folder instanceof TFolder)) {
+      throw new Error(`${dirPath} is not a folder`)
+    }
 
-				const files = folder.children.filter(
-						(item) => item instanceof TFile && !item.name.startsWith('idx-')
-				);
+    const files = folder.children.filter(
+      (item) => item instanceof TFile && !item.name.startsWith('idx-'),
+    )
 
-				return files.length === 0;
-		}
+    return files.length === 0
+  }
 
-		private async writeFile(filePath: string, content: string): Promise<void> {
-				const file = this.app.vault.getAbstractFileByPath(filePath);
-				if (file instanceof TFile) {
-						await this.app.vault.modify(file, content);
-				} else {
-						await this.app.vault.create(filePath, content);
-				}
-		}
+  private async writeFile(filePath: string, content: string): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(filePath)
+    if (file instanceof TFile) {
+      await this.app.vault.modify(file, content)
+    } else {
+      await this.app.vault.create(filePath, content)
+    }
+  }
 
-		private async appendToFile(filePath: string, content: string): Promise<void> {
-				const file = this.app.vault.getAbstractFileByPath(filePath);
-				if (file instanceof TFile) {
-						const existingContent = await this.app.vault.read(file);
-						await this.app.vault.modify(file, existingContent + content);
-				} else {
-						await this.app.vault.create(filePath, content);
-				}
-		}
+  private async appendToFile(filePath: string, content: string): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(filePath)
+    if (file instanceof TFile) {
+      const existingContent = await this.app.vault.read(file)
+      await this.app.vault.modify(file, existingContent + content)
+    } else {
+      await this.app.vault.create(filePath, content)
+    }
+  }
 
-		private async deleteFile(filePath: string): Promise<void> {
-				const file = this.app.vault.getAbstractFileByPath(filePath);
-				if (file instanceof TFile) {
-						await this.app.vault.delete(file);
-				}
-		}
+  private async deleteFile(filePath: string): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(filePath)
+    if (file instanceof TFile) {
+      await this.app.vault.delete(file)
+    }
+  }
 
-		public async onload() {
-				console.log(`Findex: loading plugin v${this.manifest.version}`);
+  public async onload() {
+    console.log(`Findex: loading plugin v${this.manifest.version}`)
 
-				await this.loadData();
-				this.log('loaded Data: ', this.data);
+    await this.loadData()
+    this.log('loaded Data: ', this.data)
 
-				// Extract the index building functionality into a separate method
-				const buildFolderIndex = async (dirPath: string) => {
-						const folder = this.app.vault.getAbstractFileByPath(dirPath)
-						if (!(folder instanceof TFolder)) {
-								new Notice(`${dirPath} is not a valid folder`)
-								return
-						}
-								
-								if (
-										this.data.omittedFolders
-												.map((item) => path.basename(item))
-												.includes(path.basename(dirPath))
-								) {
-										return;
-								}
+    // Extract the index building functionality into a separate method
+    const buildFolderIndex = async (dirPath: string) => {
+      const folder = this.app.vault.getAbstractFileByPath(dirPath)
+      if (!(folder instanceof TFolder)) {
+        new Notice(`${dirPath} is not a valid folder`)
+        return
+      }
 
-								const getSortedFiles = async (dir: string): Promise<string[]> => {
-										const folder = this.app.vault.getAbstractFileByPath(dir);
-										if (!(folder instanceof TFolder)) {
-												throw new Error(`${dir} is not a folder`);
-										}
+      if (
+        this.data.omittedFolders
+          .map((item) => path.basename(item))
+          .includes(path.basename(dirPath))
+      ) {
+        return
+      }
 
-										const filesInDir = folder.children.filter(
-												(item) => 
-												item instanceof TFile && 
-														item.extension === 'md' && 
-														!item.name.startsWith('idx-') && 
-														item.name !== '.indexHeading.md'
-										) as TFile[];
+      const getSortedFiles = async (dir: string): Promise<string[]> => {
+        const folder = this.app.vault.getAbstractFileByPath(dir)
+        if (!(folder instanceof TFolder)) {
+          throw new Error(`${dir} is not a folder`)
+        }
 
-										return filesInDir
-												.map((file) => file.path)
-												.sort(
-														(a, b) =>
-														(this.app.vault.getAbstractFileByPath(b) as TFile)?.stat.mtime -
-														(this.app.vault.getAbstractFileByPath(a) as TFile)?.stat.mtime
-												);
-								};
+        const filesInDir = folder.children.filter(
+          (item) =>
+            item instanceof TFile &&
+            item.extension === 'md' &&
+            !item.name.startsWith('idx-') &&
+            item.name !== '.indexHeading.md',
+        ) as TFile[]
 
-								try {
-										const files = await getSortedFiles(dirPath);
+        return filesInDir
+          .map((file) => file.path)
+          .sort(
+            (a, b) =>
+              (this.app.vault.getAbstractFileByPath(b) as TFile)?.stat.mtime -
+              (this.app.vault.getAbstractFileByPath(a) as TFile)?.stat.mtime,
+          )
+      }
 
-										const findexFile = path.join(
-												dirPath,
-												`idx-${path.basename(dirPath)}.md`.toLowerCase()
-										);
-										const indexHeader = path.join(dirPath, '.indexHeading.md');
+      try {
+        const files = await getSortedFiles(dirPath)
 
-										this.log('The list of files:', files);
-										this.log('The index file:', findexFile);
+        const findexFile = path.join(
+          dirPath,
+          `idx-${path.basename(dirPath)}.md`.toLowerCase(),
+        )
+        const indexHeader = path.join(dirPath, '.indexHeading.md')
 
-										let headerContent = '';
-										if (this.app.vault.getAbstractFileByPath(indexHeader)) {
-												const headerFile = this.app.vault.getAbstractFileByPath(
-														indexHeader
-												) as TFile;
-												headerContent = await this.app.vault.read(headerFile);
-										} else {
-												headerContent = `# A list of files in ${path.basename(dirPath)}\n\n`;
-										}
+        this.log('The list of files:', files)
+        this.log('The index file:', findexFile)
 
-										await this.writeFile(findexFile, headerContent);
+        let headerContent = ''
+        if (this.app.vault.getAbstractFileByPath(indexHeader)) {
+          const headerFile = this.app.vault.getAbstractFileByPath(
+            indexHeader,
+          ) as TFile
+          headerContent = await this.app.vault.read(headerFile)
+        } else {
+          headerContent = `# A list of files in ${path.basename(dirPath)}\n\n`
+        }
 
-										for (const file of files) {
-												await this.appendToFile(findexFile, ` - [[${file}]]\n`);
-										}
+        await this.writeFile(findexFile, headerContent)
 
-										new Notice(`Updated index for ${path.basename(dirPath)}`);
-								} catch (error) {
-										console.error('Error building index:', error);
-										new Notice(`Error updating index for ${path.basename(dirPath)}`);
-								}
-							 };
+        for (const file of files) {
+          await this.appendToFile(findexFile, ` - [[${file}]]\n`)
+        }
 
-						// This creates an icon in the left ribbon.
-						const ribbonIconEl = this.addRibbonIcon(
-								'list-x',
-								'Folder Listing',
-								(evt: MouseEvent) => {
-										// called when the user clicks the icon.
-										this.loadData();
-										const activeFile = this.app.workspace.getActiveFile();
-										if (!activeFile) {
-												new Notice('No active file selected');
-												return;
-										}
+        new Notice(`Updated index for ${path.basename(dirPath)}`)
+      } catch (error) {
+        console.error('Error building index:', error)
+        new Notice(`Error updating index for ${path.basename(dirPath)}`)
+      }
+    }
 
-										const dirPath = activeFile.parent?.path ?? '';
-										if (!dirPath) {
-												new Notice('Cannot determine parent folder')
-												return
-										}
-										
-										this.log('ribbonIconEL - dirPath ', dirPath);
-										buildFolderIndex(dirPath);
-								}
-						);
+    // This creates an icon in the left ribbon.
+    const ribbonIconEl = this.addRibbonIcon(
+      'list-x',
+      'Folder Listing',
+      (evt: MouseEvent) => {
+        // called when the user clicks the icon.
+        this.loadData()
+        const activeFile = this.app.workspace.getActiveFile()
+        if (!activeFile) {
+          new Notice('No active file selected')
+          return
+        }
 
-						const handleFileEvent = async (file: TAbstractFile) => {
-								this.log('handleFileEvent - file.path', file.path);
+        const dirPath = activeFile.parent?.path ?? ''
+        if (!dirPath) {
+          new Notice('Cannot determine parent folder')
+          return
+        }
 
-								if (
-										!file ||
-												file.path.includes('idx-') ||
-												file.path.endsWith('.indexHeading.md')
-								) {
-										return;
-								}
+        this.log('ribbonIconEL - dirPath ', dirPath)
+        buildFolderIndex(dirPath)
+      },
+    )
 
-								const activeFile = this.app.workspace.getActiveFile();
-								if (!activeFile) {
-										return;
-								}
+    const handleFileEvent = async (file: TAbstractFile) => {
+      this.log('handleFileEvent - file.path', file.path)
 
-								const parentPath = activeFile.parent?.path;
-								if (!parentPath) {
-										return;
-								}
+      if (
+        !file ||
+        file.path.includes('idx-') ||
+        file.path.endsWith('.indexHeading.md')
+      ) {
+        return
+      }
 
-								if (file.parent?.path === parentPath) {
-										const dirPath = parentPath;
+      const activeFile = this.app.workspace.getActiveFile()
+      if (!activeFile) {
+        return
+      }
 
-										if (this.updateDebounceTimers[dirPath]) {
-												clearTimeout(this.updateDebounceTimers[dirPath]);
-										}
+      const parentPath = activeFile.parent?.path
+      if (!parentPath) {
+        return
+      }
 
-										this.updateDebounceTimers[dirPath] = setTimeout(async () => {
-												if (await this.isFolderEmpty(dirPath)) {
-														const findexFile = path.join(
-																dirPath,
-																`idx-${path.basename(dirPath)}.md`.toLowerCase()
-														);
+      if (file.parent?.path === parentPath) {
+        const dirPath = parentPath
 
-														if (this.app.vault.getAbstractFileByPath(findexFile)) {
-																await this.deleteFile(findexFile);
-																this.log('Deleted index file:', findexFile);
-																new Notice(`Deleted index for ${path.basename(dirPath)}`);
-														}
-												} else {
-														// Rebuild index if directory is not empty
-														await buildFolderIndex(dirPath);
-												}
+        if (this.updateDebounceTimers[dirPath]) {
+          clearTimeout(this.updateDebounceTimers[dirPath])
+        }
 
-												delete this.updateDebounceTimers[dirPath];
-										}, 3000); // 3-second delay
-								}
-						};
+        this.updateDebounceTimers[dirPath] = setTimeout(async () => {
+          if (await this.isFolderEmpty(dirPath)) {
+            const findexFile = path.join(
+              dirPath,
+              `idx-${path.basename(dirPath)}.md`.toLowerCase(),
+            )
 
-						// Register event for file ops using common handler
-						this.registerEvent(this.app.vault.on('modify', handleFileEvent));
-						this.registerEvent(this.app.vault.on('create', handleFileEvent));
-						this.registerEvent(this.app.vault.on('delete', handleFileEvent));
-						this.registerEvent(this.app.vault.on('rename', handleFileEvent));
+            if (this.app.vault.getAbstractFileByPath(findexFile)) {
+              await this.deleteFile(findexFile)
+              this.log('Deleted index file:', findexFile)
+              new Notice(`Deleted index for ${path.basename(dirPath)}`)
+            }
+          } else {
+            // Rebuild index if directory is not empty
+            await buildFolderIndex(dirPath)
+          }
 
-						// This adds a settings tab so the user can configure various aspects of the plugin
-						this.addSettingTab(new FindexSettingTab(this.app, this));
+          delete this.updateDebounceTimers[dirPath]
+        }, 3000) // 3-second delay
+      }
+    }
 
-						// If the plugin hooks up any global DOM events (on parts of the app that do not belong to this plugin)
-						// Using this function automatically removes the event listener when this plugin is disabled.
-						this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-								//			this.log('click', evt);
-						});
+    // Register event for file ops using common handler
+    this.registerEvent(this.app.vault.on('modify', handleFileEvent))
+    this.registerEvent(this.app.vault.on('create', handleFileEvent))
+    this.registerEvent(this.app.vault.on('delete', handleFileEvent))
+    this.registerEvent(this.app.vault.on('rename', handleFileEvent))
 
-						// When registering intervals, this function automatically clears the interval when the plugin is disabled.
-						this.registerInterval(
-								window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000)
-						);
-				}
+    // This adds a settings tab so the user can configure various aspects of the plugin
+    this.addSettingTab(new FindexSettingTab(this.app, this))
 
-				onunload() {}
-		}
+    // If the plugin hooks up any global DOM events (on parts of the app that do not belong to this plugin)
+    // Using this function automatically removes the event listener when this plugin is disabled.
+    this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
+      //			this.log('click', evt);
+    })
 
-		class FindexSettingTab extends PluginSettingTab {
-				private readonly plugin: FindexPlugin;
+    // When registering intervals, this function automatically clears the interval when the plugin is disabled.
+    this.registerInterval(
+      window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000),
+    )
+  }
 
-				constructor(app: App, plugin: FindexPlugin) {
-						super(app, plugin);
-						this.plugin = plugin;
-				}
+  onunload() {}
+}
 
-				public display(): void {
-						const { containerEl } = this;
+class FindexSettingTab extends PluginSettingTab {
+  private readonly plugin: FindexPlugin
 
-						console.log('this.plugin ', this.plugin);
-						console.log(
-								'plugin.data.omittedFolders: ',
-								this.plugin.data.omittedFolders
-						);
+  constructor(app: App, plugin: FindexPlugin) {
+    super(app, plugin)
+    this.plugin = plugin
+  }
 
-						containerEl.empty();
-						containerEl.createEl('h2', { text: 'Findex: folder indexing' });
+  public display(): void {
+    const { containerEl } = this
 
-						const fragment = document.createDocumentFragment();
-						const link = document.createElement('a');
-						link.href =
-								'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions#writing_a_regular_expression_pattern';
-						link.text = 'MDN - Regular expressions';
-						fragment.append('RegExp patterns to ignore. One pattern per line. See ');
-						fragment.append(link);
-						fragment.append(' for help.');
+    console.log('this.plugin ', this.plugin)
+    console.log('plugin.data.omittedFolders: ', this.plugin.data.omittedFolders)
 
-						new Setting(containerEl)
-								.setName('Omitted folder pathname patterns')
-								.setDesc(fragment)
-								.addTextArea((textArea) => {
-										textArea.inputEl.setAttr('rows', 6);
-										textArea
-												.setPlaceholder('^daily/\n\\.png$\nfoobar.*baz')
-												.setValue(this.plugin.data.omittedFolders.join('\n'));
+    containerEl.empty()
+    containerEl.createEl('h2', { text: 'Findex: folder indexing' })
 
-										textArea.inputEl.onblur = async (e: FocusEvent) => {
-												const patterns = (e.target as HTMLInputElement).value;
-												this.plugin.data.omittedFolders = patterns.split('\n').map((item) => {
-														return item.endsWith('/') ? item.slice(0, -1) : item;
-												});
-												// console.log(' -- ',this.plugin.data.omittedFolders);
-												await this.plugin.saveData();
-										};
-								});
+    const fragment = document.createDocumentFragment()
+    const link = document.createElement('a')
+    link.href =
+      'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions#writing_a_regular_expression_pattern'
+    link.text = 'MDN - Regular expressions'
+    fragment.append('RegExp patterns to ignore. One pattern per line. See ')
+    fragment.append(link)
+    fragment.append(' for help.')
 
-						// Add debug toggle
-						new Setting(containerEl)
-								.setName('Enable debug mode')
-								.setDesc(
-										'When enabled, detailed logs will be printed to the developer console'
-								)
-								.addToggle((toggle) =>
-										toggle.setValue(this.plugin.data.debug).onChange(async (value) => {
-												this.plugin.data.debug = value;
-												await this.plugin.saveData();
-										})
-								);
-				}
-		}
+    new Setting(containerEl)
+      .setName('Omitted folder pathname patterns')
+      .setDesc(fragment)
+      .addTextArea((textArea) => {
+        textArea.inputEl.setAttr('rows', 6)
+        textArea
+          .setPlaceholder('^daily/\n\\.png$\nfoobar.*baz')
+          .setValue(this.plugin.data.omittedFolders.join('\n'))
+
+        textArea.inputEl.onblur = async (e: FocusEvent) => {
+          const patterns = (e.target as HTMLInputElement).value
+          this.plugin.data.omittedFolders = patterns.split('\n').map((item) => {
+            return item.endsWith('/') ? item.slice(0, -1) : item
+          })
+          // console.log(' -- ',this.plugin.data.omittedFolders);
+          await this.plugin.saveData()
+        }
+      })
+
+    // Add debug toggle
+    new Setting(containerEl)
+      .setName('Enable debug mode')
+      .setDesc(
+        'When enabled, detailed logs will be printed to the developer console',
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.data.debug).onChange(async (value) => {
+          this.plugin.data.debug = value
+          await this.plugin.saveData()
+        }),
+      )
+  }
+}
