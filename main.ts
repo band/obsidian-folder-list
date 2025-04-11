@@ -46,11 +46,13 @@ export default class FindexPlugin extends Plugin {
     if (!(folder instanceof TFolder)) {
       throw new Error(`${dirPath} is not a folder`)
     }
-
     const files = folder.children.filter(
-      (item) => item instanceof TFile && !item.name.startsWith('idx-'),
+      (item) =>
+        item instanceof TFile &&
+        !item.name.startsWith('idx-') &&
+        item.name !== '.indexHeading.md',
     )
-
+    this.log('isFolderEmpty - files', files)
     return files.length === 0
   }
 
@@ -99,6 +101,14 @@ export default class FindexPlugin extends Plugin {
           .map((item) => path.basename(item))
           .includes(path.basename(dirPath))
       ) {
+        return
+      }
+
+      if (await this.isFolderEmpty(dirPath)) {
+        await this.deleteFile(
+          path.join(dirPath, `idx-${path.basename(dirPath)}.md`.toLowerCase()),
+        )
+        new Notice(`Folder ${dirPath} is empty`)
         return
       }
 
@@ -184,8 +194,8 @@ export default class FindexPlugin extends Plugin {
       },
     )
 
-    const handleFileEvent = async (file: TAbstractFile) => {
-      this.log('handleFileEvent - file.path', file.path)
+    const handleFileEvent = async (file: TAbstractFile, eventType: 'modify' | 'create' | 'delete' | 'rename') => {
+      this.log(`handleFileEvent - ${eventType} - file.path', ${file.path}`)
 
       if (
         !file ||
@@ -234,11 +244,11 @@ export default class FindexPlugin extends Plugin {
       }
     }
 
-    // Register event for file ops using common handler
-    this.registerEvent(this.app.vault.on('modify', handleFileEvent))
-    this.registerEvent(this.app.vault.on('create', handleFileEvent))
-    this.registerEvent(this.app.vault.on('delete', handleFileEvent))
-    this.registerEvent(this.app.vault.on('rename', handleFileEvent))
+    // Register event for file ops with event type information
+    this.registerEvent(this.app.vault.on('modify', (file) => handleFileEvent(file, 'modify')))
+    this.registerEvent(this.app.vault.on('create', (file) => handleFileEvent(file, 'create')))
+    this.registerEvent(this.app.vault.on('delete', (file) => handleFileEvent(file, 'delete')))
+    this.registerEvent(this.app.vault.on('rename', (file) => handleFileEvent(file, 'rename')))
 
     // This adds a settings tab so the user can configure various aspects of the plugin
     this.addSettingTab(new FindexSettingTab(this.app, this))
