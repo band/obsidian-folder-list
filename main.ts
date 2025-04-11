@@ -82,93 +82,112 @@ export default class FindexPlugin extends Plugin {
     }
   }
 
+  // Extract the index building functionality into a class method
+  private async buildFolderIndex(dirPath: string): Promise<void> {
+    const folder = this.app.vault.getAbstractFileByPath(dirPath)
+    if (!(folder instanceof TFolder)) {
+      new Notice(`${dirPath} is not a valid folder`)
+      return
+    }
+
+    if (
+      this.data.omittedFolders
+        .map((item) => path.basename(item))
+        .includes(path.basename(dirPath))
+    ) {
+      return
+    }
+
+    if (await this.isFolderEmpty(dirPath)) {
+      await this.deleteFile(
+        path.join(dirPath, `idx-${path.basename(dirPath)}.md`.toLowerCase()),
+      )
+      new Notice(`Folder ${dirPath} is empty`)
+      return
+    }
+
+    const getSortedFiles = async (dir: string): Promise<string[]> => {
+      const folder = this.app.vault.getAbstractFileByPath(dir)
+      if (!(folder instanceof TFolder)) {
+        throw new Error(`${dir} is not a folder`)
+      }
+
+      const filesInDir = folder.children.filter(
+        (item) =>
+          item instanceof TFile &&
+          item.extension === 'md' &&
+          !item.name.startsWith('idx-') &&
+          item.name !== '.indexHeading.md',
+      ) as TFile[]
+
+      return filesInDir
+        .map((file) => file.path)
+        .sort(
+          (a, b) =>
+            (this.app.vault.getAbstractFileByPath(b) as TFile)?.stat.mtime -
+            (this.app.vault.getAbstractFileByPath(a) as TFile)?.stat.mtime,
+        )
+    }
+
+    try {
+      const files = await getSortedFiles(dirPath)
+
+      const findexFile = path.join(
+        dirPath,
+        `idx-${path.basename(dirPath)}.md`.toLowerCase(),
+      )
+      const indexHeader = path.join(dirPath, '.indexHeading.md')
+
+      this.log('The list of files:', files)
+      this.log('The index file:', findexFile)
+
+      let headerContent = ''
+      if (this.app.vault.getAbstractFileByPath(indexHeader)) {
+        const headerFile = this.app.vault.getAbstractFileByPath(
+          indexHeader,
+        ) as TFile
+        headerContent = await this.app.vault.read(headerFile)
+      } else {
+        headerContent = `# A list of files in ${path.basename(dirPath)}\n\n`
+      }
+
+      await this.writeFile(findexFile, headerContent)
+
+      for (const file of files) {
+        await this.appendToFile(findexFile, ` - [[${file}]]\n`)
+      }
+
+      new Notice(`Updated index for ${path.basename(dirPath)}`)
+    } catch (error) {
+      console.error('Error building index:', error)
+      new Notice(`Error updating index for ${path.basename(dirPath)}`)
+    }
+  }
+
+  // Add the helper method for updating index
+  private async updateIndexForDirectory(dirPath: string): Promise<void> {
+    if (await this.isFolderEmpty(dirPath)) {
+      const findexFile = path.join(
+        dirPath,
+        `idx-${path.basename(dirPath)}.md`.toLowerCase(),
+      )
+
+      if (this.app.vault.getAbstractFileByPath(findexFile)) {
+        await this.deleteFile(findexFile)
+        this.log('Deleted index file:', findexFile)
+        new Notice(`Deleted index for ${path.basename(dirPath)}`)
+      }
+    } else {
+      // Rebuild index if directory is not empty
+      await this.buildFolderIndex(dirPath) // Call it with this.
+    }
+  }
+
   public async onload() {
     console.log(`Findex: loading plugin v${this.manifest.version}`)
 
     await this.loadData()
     this.log('loaded Data: ', this.data)
-
-    // Extract the index building functionality into a separate method
-    const buildFolderIndex = async (dirPath: string) => {
-      const folder = this.app.vault.getAbstractFileByPath(dirPath)
-      if (!(folder instanceof TFolder)) {
-        new Notice(`${dirPath} is not a valid folder`)
-        return
-      }
-
-      if (
-        this.data.omittedFolders
-          .map((item) => path.basename(item))
-          .includes(path.basename(dirPath))
-      ) {
-        return
-      }
-
-      if (await this.isFolderEmpty(dirPath)) {
-        await this.deleteFile(
-          path.join(dirPath, `idx-${path.basename(dirPath)}.md`.toLowerCase()),
-        )
-        new Notice(`Folder ${dirPath} is empty`)
-        return
-      }
-
-      const getSortedFiles = async (dir: string): Promise<string[]> => {
-        const folder = this.app.vault.getAbstractFileByPath(dir)
-        if (!(folder instanceof TFolder)) {
-          throw new Error(`${dir} is not a folder`)
-        }
-
-        const filesInDir = folder.children.filter(
-          (item) =>
-            item instanceof TFile &&
-            item.extension === 'md' &&
-            !item.name.startsWith('idx-') &&
-            item.name !== '.indexHeading.md',
-        ) as TFile[]
-
-        return filesInDir
-          .map((file) => file.path)
-          .sort(
-            (a, b) =>
-              (this.app.vault.getAbstractFileByPath(b) as TFile)?.stat.mtime -
-              (this.app.vault.getAbstractFileByPath(a) as TFile)?.stat.mtime,
-          )
-      }
-
-      try {
-        const files = await getSortedFiles(dirPath)
-
-        const findexFile = path.join(
-          dirPath,
-          `idx-${path.basename(dirPath)}.md`.toLowerCase(),
-        )
-        const indexHeader = path.join(dirPath, '.indexHeading.md')
-
-        this.log('The list of files:', files)
-        this.log('The index file:', findexFile)
-
-        let headerContent = ''
-        if (this.app.vault.getAbstractFileByPath(indexHeader)) {
-          const headerFile = this.app.vault.getAbstractFileByPath(
-            indexHeader,
-          ) as TFile
-          headerContent = await this.app.vault.read(headerFile)
-        } else {
-          headerContent = `# A list of files in ${path.basename(dirPath)}\n\n`
-        }
-
-        await this.writeFile(findexFile, headerContent)
-
-        for (const file of files) {
-          await this.appendToFile(findexFile, ` - [[${file}]]\n`)
-        }
-
-        new Notice(`Updated index for ${path.basename(dirPath)}`)
-      } catch (error) {
-        console.error('Error building index:', error)
-        new Notice(`Error updating index for ${path.basename(dirPath)}`)
-      }
-    }
 
     // This creates an icon in the left ribbon.
     const ribbonIconEl = this.addRibbonIcon(
@@ -190,12 +209,15 @@ export default class FindexPlugin extends Plugin {
         }
 
         this.log('ribbonIconEL - dirPath ', dirPath)
-        buildFolderIndex(dirPath)
+        this.buildFolderIndex(dirPath)
       },
     )
 
-    const handleFileEvent = async (file: TAbstractFile, eventType: 'modify' | 'create' | 'delete' | 'rename') => {
-      this.log(`handleFileEvent - ${eventType} - file.path', ${file.path}`)
+    const handleFileEvent = async (
+      file: TAbstractFile,
+      eventType: 'create' | 'modify' | 'delete' | 'rename',
+    ) => {
+      this.log(`handleFileEvent - ${eventType} - file.path: ${file.path}`)
 
       if (
         !file ||
@@ -218,37 +240,47 @@ export default class FindexPlugin extends Plugin {
       if (file.parent?.path === parentPath) {
         const dirPath = parentPath
 
-        if (this.updateDebounceTimers[dirPath]) {
-          clearTimeout(this.updateDebounceTimers[dirPath])
-        }
-
-        this.updateDebounceTimers[dirPath] = setTimeout(async () => {
-          if (await this.isFolderEmpty(dirPath)) {
-            const findexFile = path.join(
-              dirPath,
-              `idx-${path.basename(dirPath)}.md`.toLowerCase(),
-            )
-
-            if (this.app.vault.getAbstractFileByPath(findexFile)) {
-              await this.deleteFile(findexFile)
-              this.log('Deleted index file:', findexFile)
-              new Notice(`Deleted index for ${path.basename(dirPath)}`)
+        switch (eventType) {
+          case 'modify':
+            // Apply debounce only for modify events
+            if (this.updateDebounceTimers[dirPath]) {
+              clearTimeout(this.updateDebounceTimers[dirPath])
             }
-          } else {
-            // Rebuild index if directory is not empty
-            await buildFolderIndex(dirPath)
-          }
 
-          delete this.updateDebounceTimers[dirPath]
-        }, 3000) // 3-second delay
+            this.updateDebounceTimers[dirPath] = setTimeout(async () => {
+              await this.updateIndexForDirectory(dirPath)
+              delete this.updateDebounceTimers[dirPath]
+            }, 3000) // 3-second delay
+            break
+
+          case 'create':
+          case 'delete':
+          case 'rename':
+            // Handle other events immediately without debounce
+            this.log(`Handling ${eventType} event immediately for ${file.path}`)
+            await this.updateIndexForDirectory(dirPath)
+            break
+
+          default:
+            this.log(`Unknown event type: ${eventType}`)
+            break
+        }
       }
     }
 
     // Register event for file ops with event type information
-    this.registerEvent(this.app.vault.on('modify', (file) => handleFileEvent(file, 'modify')))
-    this.registerEvent(this.app.vault.on('create', (file) => handleFileEvent(file, 'create')))
-    this.registerEvent(this.app.vault.on('delete', (file) => handleFileEvent(file, 'delete')))
-    this.registerEvent(this.app.vault.on('rename', (file) => handleFileEvent(file, 'rename')))
+    this.registerEvent(
+      this.app.vault.on('modify', (file) => handleFileEvent(file, 'modify')),
+    )
+    this.registerEvent(
+      this.app.vault.on('create', (file) => handleFileEvent(file, 'create')),
+    )
+    this.registerEvent(
+      this.app.vault.on('delete', (file) => handleFileEvent(file, 'delete')),
+    )
+    this.registerEvent(
+      this.app.vault.on('rename', (file) => handleFileEvent(file, 'rename')),
+    )
 
     // This adds a settings tab so the user can configure various aspects of the plugin
     this.addSettingTab(new FindexSettingTab(this.app, this))
